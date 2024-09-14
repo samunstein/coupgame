@@ -1,6 +1,6 @@
 import socket
 
-from config import PARAM_SPLITTER, PARAM_SPLITTER_REPLACE
+from config import PARAM_SPLITTER, COMMAND_END
 
 
 class OpenSocket:
@@ -14,7 +14,7 @@ class OpenSocket:
         self.connection = connection
 
     def send(self, *msg):
-        self.connection.sendall(PARAM_SPLITTER.join([str(m) for m in msg]).encode("UTF-8"))
+        self.connection.sendall((PARAM_SPLITTER.join([str(m) for m in msg]) + COMMAND_END).encode("UTF-8"))
 
     def receive(self):
         return self.connection.recv(1024).decode("UTF-8")
