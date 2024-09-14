@@ -1,0 +1,7 @@
+STEAL = "steal"
+ASSASSINATE = "assassinate"
+FOREIGN_AID = "foreignaid"
+INCOME = "income"
+TAX = "tax"
+COUP = "coup"
+AMBASSADATE = "ambassadate"
