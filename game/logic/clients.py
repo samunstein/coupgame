@@ -42,7 +42,7 @@ class ConsoleClient(ClientLogic):
         print(f"Given {c} card. Cards now {self.cards}")
 
     def ask_name(self) -> str:
-        return input("What is your name? ")
+        return "A"# input("What is your name? ")
 
     def debug_message(self, msg: str):
         debug_print(msg)
