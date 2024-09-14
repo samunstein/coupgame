@@ -4,32 +4,7 @@ from common.common import debug_print
 from config import PARAM_SPLITTER, PARAM_SPLITTER_REPLACE
 from connection.common import OpenSocket
 from game.enums.commands import ASKNAME, GIVEMONEY, OK, GIVECARD, DEBUG_MESSAGE, ACTION, GIVEPLAYERNUMBER, ADDOPPONENT
-
-
-class ClientLogic:
-    @abstractmethod
-    def give_card(self, c: str):
-        pass
-
-    @abstractmethod
-    def give_money(self, m: int):
-        pass
-
-    @abstractmethod
-    def ask_name(self) -> str:
-        pass
-
-    @abstractmethod
-    def debug_message(self, msg: str):
-        pass
-
-    @abstractmethod
-    def set_number(self, num: int):
-        pass
-
-    @abstractmethod
-    def add_opponent(self, num: int, name: str):
-        pass
+from game.logic.clients import ClientLogic
 
 
 class PlayerClient:

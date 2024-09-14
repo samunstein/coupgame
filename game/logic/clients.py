@@ -1,6 +1,31 @@
-from common.common import debug_print
-from game.gameclient import ClientLogic
+from abc import abstractmethod
 
+from common.common import debug_print
+
+class ClientLogic:
+    @abstractmethod
+    def give_card(self, c: str):
+        pass
+
+    @abstractmethod
+    def give_money(self, m: int):
+        pass
+
+    @abstractmethod
+    def ask_name(self) -> str:
+        pass
+
+    @abstractmethod
+    def debug_message(self, msg: str):
+        pass
+
+    @abstractmethod
+    def set_number(self, num: int):
+        pass
+
+    @abstractmethod
+    def add_opponent(self, num: int, name: str):
+        pass
 
 class ConsoleClient(ClientLogic):
     def __init__(self):
