@@ -3,12 +3,9 @@ import random
 from common.common import debug_print, commands_params
 from config import PARAM_SPLITTER, CONTROL_CHAR_REPLACE, EACH_CARD_IN_DECK, WRONG_MESSAGE_TOLERANCE
 from connection.common import OpenSocket
-from game.enums.actions import all_actions_map, ACTION
-from game.enums.cards import all_cards
-from game.enums.commands import ADD_CARD, CHANGE_MONEY, ASK_NAME, DEBUG_MESSAGE, ADD_OPPONENT, SET_PLAYER_NUMBER, \
-    TAKE_TURN, ACTION_WAS_TAKEN, ACTION_WAS_BLOCKED, ACTION_WAS_CHALLENGED, BLOCK_WAS_CHALLENGED, KILL_ANY_CARD, \
-    PLAYER_DEAD, \
-    CHOOSE_AMBASSADOR_CARDS_TO_REMOVE, REMOVE_CARD, SHUTDOWN
+from game.enums.actions import all_actions_map, Action
+from game.enums.cards import all_cards, Card
+from game.enums.commands import *
 
 
 class Player:
@@ -21,7 +18,7 @@ class Player:
         self.all_players = []
 
     def __str__(self):
-        return f"{self.number} {self.name}"
+        return f"{self.name}"
 
     def _extort_a_correct_command_with_threat_of_violence(self, function_block, one_responsible):
         try:
@@ -41,15 +38,15 @@ class Player:
         self.connection.send(SHUTDOWN)
         self.connection.close()
 
-    def give_card(self, c):
+    def give_card(self, c: Card):
         self.cards.append(c)
         self.connection.send(ADD_CARD, c)
 
-    def remove_card(self, c):
+    def remove_card(self, c: Card):
         self.cards.remove(c)
         self.connection.send(REMOVE_CARD, c)
 
-    def give_money(self, m):
+    def give_money(self, m: int):
         self.money += m
         self.connection.send(CHANGE_MONEY, m)
 
@@ -77,7 +74,7 @@ class Player:
         if self.money < action.cost:
             self.debug_message("Not enough money")
             return False
-        if self.money >= 10 and action != ACTION.COUP:
+        if self.money >= 10 and action != Action.COUP:
             self.debug_message("Must coup")
             return False
         return True
@@ -85,23 +82,23 @@ class Player:
     def _log_successful_action_result(self, action, target):
         debug_print(f"{action} taken by {self} on {target} successful")
         for p in self.all_players:
-            p.connection.send(ACTION_WAS_TAKEN, self.number, action, target.number)
+            p.connection.send(ACTION_WAS_TAKEN, action, self.number, target.number)
 
     def _log_block_result(self, action, target, blocked_with):
         debug_print(f"{action} taken by {self} on {target} blocked with {blocked_with}")
         for p in self.all_players:
-            p.connection.send(ACTION_WAS_BLOCKED, self.number, action, target.number, blocked_with)
+            p.connection.send(ACTION_WAS_BLOCKED, action, self.number, target.number, blocked_with)
 
     def _log_challenge_result(self, action, target, challenger, successful):
         debug_print(f"{action} taken by {self} on {target} challenged by {challenger.name} with success {successful}")
         for p in self.all_players:
-            p.connection.send(ACTION_WAS_CHALLENGED, self.number, action, target.number, challenger.number, successful)
+            p.connection.send(ACTION_WAS_CHALLENGED, action, self.number, target.number, challenger.number, successful)
 
     def _log_block_challenge_result(self, action, target, blocked_with, challenger, successful):
         debug_print(
             f"Blocking with {blocked_with} the {action} taken by {self} on {target} challenged by {challenger} with success {successful}")
         for p in self.all_players:
-            p.connection.send(BLOCK_WAS_CHALLENGED, self.number, action, target.number, challenger.number, blocked_with, successful)
+            p.connection.send(BLOCK_WAS_CHALLENGED, action, self.number, target.number, blocked_with, challenger.number, successful)
 
     def _handle_challenges(self, action, target_number, other_players):
         # TODO: Go around the players probably as many times as there are players and see if anyone challenges
@@ -122,36 +119,37 @@ class Player:
         money_stolen = min(target_player.money, 2)
         self.give_money(money_stolen)
         target_player.give_money(-money_stolen)
-        self._log_successful_action_result(ACTION.STEAL, target_player)
+        self._log_successful_action_result(Action.STEAL, target_player)
 
     def a_player_is_dead(self, target_player):
-        self.connection.send(PLAYER_DEAD, target_player.number)
+        self.connection.send(A_PLAYER_IS_DEAD, target_player.number)
 
     def _handle_assassinate(self, target_num, other_players):
         target_player = other_players[target_num]
         self.give_money(-3)
         # Target chooses which card to kill
         def closure_block():
-            killed = target_player.connection.send_and_receive(KILL_ANY_CARD)
+            killed = commands_params(target_player.connection.send_and_receive(CHOOSE_CARD_TO_KILL))[0][0]
+            print(killed, target_player.cards)
             if killed not in target_player.cards:
                 target_player.debug_message("You don't have that card")
                 return False
             target_player.cards.remove(killed)
-            self._log_successful_action_result(ACTION.ASSASSINATE, target_player)
+            self._log_successful_action_result(Action.ASSASSINATE, target_player)
             return True
         self._extort_a_correct_command_with_threat_of_violence(closure_block, target_player)
 
     def _handle_foreign_aid(self):
         self.give_money(2)
-        self._log_successful_action_result(ACTION.FOREIGN_AID, self)
+        self._log_successful_action_result(Action.FOREIGN_AID, self)
 
     def _handle_income(self):
         self.give_money(1)
-        self._log_successful_action_result(ACTION.INCOME, self)
+        self._log_successful_action_result(Action.INCOME, self)
 
     def _handle_tax(self):
         self.give_money(3)
-        self._log_successful_action_result(ACTION.TAX, self)
+        self._log_successful_action_result(Action.TAX, self)
 
     def _handle_coup(self, target_num, other_players):
         target_player = other_players[target_num]
@@ -163,7 +161,7 @@ class Player:
                 target_player.debug_message("You don't have that card")
                 return False
             target_player.cards.remove(killed)
-            self._log_successful_action_result(ACTION.COUP, target_player)
+            self._log_successful_action_result(Action.COUP, target_player)
             return True
         self._extort_a_correct_command_with_threat_of_violence(closure_block, target_player)
 
@@ -187,7 +185,7 @@ class Player:
             self.remove_card(cards[1])
             deck.append(cards[0])
             deck.append(cards[1])
-            self._log_successful_action_result(ACTION.AMBASSADATE, self)
+            self._log_successful_action_result(Action.AMBASSADATE, self)
             return True
         self._extort_a_correct_command_with_threat_of_violence(closure_block, self)
 
@@ -210,19 +208,19 @@ class Player:
             self._handle_challenges(action, target_number, other_players)
             self._handle_blocks(action, target_number, other_players)
 
-            if action == ACTION.STEAL:
+            if action == Action.STEAL:
                 self._handle_steal(target_number, other_players)
-            elif action == ACTION.ASSASSINATE:
+            elif action == Action.ASSASSINATE:
                 self._handle_assassinate(target_number, other_players)
-            elif action == ACTION.FOREIGN_AID:
+            elif action == Action.FOREIGN_AID:
                 self._handle_foreign_aid()
-            elif action == ACTION.INCOME:
+            elif action == Action.INCOME:
                 self._handle_income()
-            elif action == ACTION.TAX:
+            elif action == Action.TAX:
                 self._handle_tax()
-            elif action == ACTION.COUP:
+            elif action == Action.COUP:
                 self._handle_coup(target_number, other_players)
-            elif action == ACTION.AMBASSADATE:
+            elif action == Action.AMBASSADATE:
                 self._handle_ambassadate(deck)
             return True
 
@@ -234,8 +232,8 @@ class Game:
             c.connection.settimeout(10)
         self.players = {i: Player(i, c) for i, c in enumerate(connections)}
         for p in self.players.values():
-            p.find_name()
             p.player_number(p.number)
+            p.find_name()
         debug_print(f"Players {[p.name for p in self.players.values()]} joined.")
         self.alive_players = list(self.players.values())
         self.deck = []

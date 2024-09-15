@@ -8,11 +8,11 @@ SET_PLAYER_NUMBER = "player_number"
 # State changing actions
 ADD_CARD = "add_card"
 CHANGE_MONEY = "change_money"
-KILL_CARD = "kill_card"
-KILL_ANY_CARD = "kill_any_card"
-REMOVE_CARD = "remove_card" # Unsuccessfully challenged
+REMOVE_CARD = "remove_card"
+
+# Card decisions
+CHOOSE_CARD_TO_KILL = "kill_any_card"
 CHOOSE_AMBASSADOR_CARDS_TO_REMOVE = "choose_ambassador_cards"
-PLAYER_DEAD = "player_dead"
 
 # Turn flow
 TAKE_TURN = "take_turn"
@@ -27,4 +27,5 @@ ACTION_WAS_TAKEN = "action_taken"
 ACTION_WAS_BLOCKED = "action_blocked"
 ACTION_WAS_CHALLENGED = "challenge_result"
 BLOCK_WAS_CHALLENGED = "block_challenge_result"
-CARD_DEAD = "card_dead"
+PLAYER_LOST_A_CARD = "card_dead"
+A_PLAYER_IS_DEAD = "player_dead"
