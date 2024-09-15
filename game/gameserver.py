@@ -3,7 +3,8 @@ import random
 from common.common import debug_print, commands_params, get_just_data_from_socket
 from config import PARAM_SPLITTER, CONTROL_CHAR_REPLACE, EACH_CARD_IN_DECK, WRONG_MESSAGE_TOLERANCE
 from connection.common import OpenSocket
-from game.enums.actions import all_actions_map, Action, DoYouChallengeDecision, YouAreChallengedDecision
+from game.enums.actions import all_actions_map, Action, DoYouChallengeDecision, YouAreChallengedDecision, \
+    DoYouBlockDecision
 from game.enums.cards import all_cards, Card
 from game.enums.commands import *
 
@@ -111,92 +112,216 @@ class Player:
 
     def _handle_challenges(self, action, target_number, other_players, deck):
         # Returns whether the action can continue (False if successfully challenged)
-        if len(action.requires_card):
-            other_numbers_ordered = list(other_players.keys())
-            if action.targeted:
-                other_numbers_ordered.remove(target_number)
-                other_numbers_ordered.insert(0, target_number)
+        if not len(action.requires_card):
+            return True
 
-            for other_num in other_numbers_ordered:
-                maybe_challenger = other_players[other_num]
-                def closure_block() -> (bool, any):
-                    decision = get_just_data_from_socket(
-                        maybe_challenger.connection.send_and_receive(DO_YOU_CHALLENGE_ACTION, action.name, self.number, target_number)
+        other_numbers_order = list(other_players.keys())
+        if action.targeted:
+            other_numbers_order.remove(target_number)
+            other_numbers_order.insert(0, target_number)
+
+        for other_num in other_numbers_order:
+            maybe_challenger = other_players[other_num]
+            def closure_block() -> (bool, any):
+                decision = get_just_data_from_socket(
+                    maybe_challenger.connection.send_and_receive(DO_YOU_CHALLENGE_ACTION, action.name, self.number, target_number)
+                )[0]
+                if decision == DoYouChallengeDecision.CHALLENGE.value:
+                    return True, True
+                elif decision == DoYouChallengeDecision.ALLOW.value:
+                    return True, False
+                else:
+                    maybe_challenger.debug_message("Challenge or allow the action please")
+                    return False, None
+            challenge = self._extort_a_correct_command_with_threat_of_violence(closure_block, maybe_challenger)
+            # Since we're kind of in the middle of logic, handle player dying because of idiocy here
+            if challenge is None:
+                self._handle_dead_players_in_the_middle_of_actions(other_players)
+
+            if challenge == False:
+                continue
+
+            if challenge == True:
+                def closure_block():
+                    what_do = get_just_data_from_socket(
+                        self.connection.send_and_receive(YOUR_ACTION_IS_CHALLENGED, action.name, target_number, maybe_challenger.number)
                     )[0]
-                    if decision == DoYouChallengeDecision.CHALLENGE.value:
-                        return True, True
-                    elif decision == DoYouChallengeDecision.ALLOW.value:
-                        return True, False
-                    else:
-                        maybe_challenger.debug_message("Challenge or allow the action please")
-                        return False, None
-                challenge = self._extort_a_correct_command_with_threat_of_violence(closure_block, maybe_challenger)
-                # Since we're kind of in the middle of logic, handle player dying because of idiocy here
-                if challenge is None:
-                    self._handle_dead_players_in_the_middle_of_actions(other_players)
-
-                if challenge == False:
-                    continue
-
-                if challenge == True:
-                    def closure_block():
-                        what_do = get_just_data_from_socket(
-                            self.connection.send_and_receive(YOUR_ACTION_IS_CHALLENGED, action.name, target_number, maybe_challenger.number)
-                        )[0]
-                        if what_do == YouAreChallengedDecision.CONCEDE.value:
+                    if what_do == YouAreChallengedDecision.CONCEDE.value:
+                        return True, what_do
+                    elif what_do == YouAreChallengedDecision.REVEAL_CARD.value:
+                        required_card = action.requires_card[0]
+                        if required_card in self.cards:
                             return True, what_do
-                        elif what_do == YouAreChallengedDecision.REVEAL_CARD.value:
-                            required_card = action.requires_card[0]
-                            if required_card in self.cards:
-                                return True, what_do
-                            else:
-                                self.debug_message("You don't have the card to reveal. Concede.")
-                                return False, None
                         else:
-                            self.debug_message("Choose to concede or reveal please")
+                            self.debug_message("You don't have the card to reveal. Concede.")
                             return False, None
-
-                    what_did = self._extort_a_correct_command_with_threat_of_violence(closure_block, self)
-
-                    if what_did == YouAreChallengedDecision.REVEAL_CARD.value:
-                        challenge_success = False
-                        life_loser = maybe_challenger
-
-                        card = action.requires_card[0]
-                        self.remove_card(card)
-                        deck.append(card)
-                        random.shuffle(deck)
-                        self.give_card(deck.pop())
-
                     else:
-                        challenge_success = True
-                        life_loser = self
+                        self.debug_message("Choose to concede or reveal please")
+                        return False, None
 
-                    def dead_chooser_closure():
-                        killed = get_just_data_from_socket(life_loser.connection.send_and_receive(CHOOSE_CARD_TO_KILL))[0]
-                        if killed not in life_loser.cards:
-                            print(killed, life_loser.cards)
-                            life_loser.debug_message("You don't have that card")
-                            return False, None
-                        life_loser.remove_card(killed)
-                        self._log_challenge_result(action, target_number, maybe_challenger.number, challenge_success)
-                        return True, None
+                what_did = self._extort_a_correct_command_with_threat_of_violence(closure_block, self)
 
-                    self._extort_a_correct_command_with_threat_of_violence(dead_chooser_closure, life_loser)
+                if what_did == YouAreChallengedDecision.REVEAL_CARD.value:
+                    challenge_success = False
+                    life_loser = maybe_challenger
 
-                    # Challenge not successful => action may continue
-                    return not challenge_success
+                    card = action.requires_card[0]
+                    self.remove_card(card)
+                    deck.append(card)
+                    random.shuffle(deck)
+                    self.give_card(deck.pop())
 
-            # No challenges, return
-            return True
-        else:
-            return True
+                else:
+                    challenge_success = True
+                    life_loser = self
+
+                def dead_chooser_closure():
+                    killed = get_just_data_from_socket(life_loser.connection.send_and_receive(CHOOSE_CARD_TO_KILL))[0]
+                    if killed not in life_loser.cards:
+                        print(killed, life_loser.cards)
+                        life_loser.debug_message("You don't have that card")
+                        return False, None
+                    life_loser.remove_card(killed)
+                    self._log_challenge_result(action, target_number, maybe_challenger.number, challenge_success)
+                    return True, None
+
+                self._extort_a_correct_command_with_threat_of_violence(dead_chooser_closure, life_loser)
+
+                # Challenge not successful => action may continue
+                return not challenge_success
+
+        # No challenges, return
+        return True
 
     def _handle_blocks(self, action, target_number, other_players, deck):
-        # TODO: If the action allows blocking, ask the defendant which card, if any, they would like to block with.
-        #       In case of block, go around the players a few times to check if anyone wants to challenge the block.
-
         # Returns whether the actions can continue (False if successfully blocked)
+        if not len(action.blocked_by):
+            return True
+
+        if action.targeted:
+            to_ask_numbers = [target_number]
+        else:
+            to_ask_numbers = list(other_players.keys())
+
+        for other_num in to_ask_numbers:
+            maybe_blocker = other_players[other_num]
+
+            def closure_block() -> (bool, any):
+                data = get_just_data_from_socket(
+                    maybe_blocker.connection.send_and_receive(DO_YOU_BLOCK, action.name, self.number)
+                )
+                if len(data) != 2:
+                    maybe_blocker.debug_message("Block decision and card please.")
+                    return False, None
+
+                decision_, card_ = data
+
+                if decision_ == DoYouBlockDecision.BLOCK.value:
+                    if card_ not in maybe_blocker.cards:
+                        maybe_blocker.debug_message("You don't have that block card")
+                        return False, None
+                    return True, (True, card_)
+                elif decision_ == DoYouBlockDecision.NO_BLOCK.value:
+                    return True, (False, None)
+                else:
+                    maybe_blocker.debug_message("Challenge or allow the action please")
+                    return False, None
+
+            block_decision = self._extort_a_correct_command_with_threat_of_violence(closure_block, maybe_blocker)
+
+            if block_decision is None:
+                self._handle_dead_players_in_the_middle_of_actions(other_players)
+
+            decision, card = block_decision
+            print(decision, card)
+            if decision == False:
+                continue
+
+            if decision == True:
+                # TODO: Check if someone challenges the block, starting with self
+                return self._handle_block_challenges(action, target_number, card, other_num, other_players, deck)
+
+        return True
+
+    def _handle_block_challenges(self, action, target_num, block_card, blocker_number, other_players, deck):
+        possible_challengers = [self.number] + [num for num in other_players if num != blocker_number]
+
+        for other_num in possible_challengers:
+            # TODO: CONTINUE THIS SHIT
+            maybe_challenger = other_players[other_num]
+
+            def closure_block() -> (bool, any):
+                decision = get_just_data_from_socket(
+                    maybe_challenger.connection.send_and_receive(DO_YOU_CHALLENGE_ACTION, action.name, self.number,
+                                                                 target_number)
+                )[0]
+                if decision == DoYouChallengeDecision.CHALLENGE.value:
+                    return True, True
+                elif decision == DoYouChallengeDecision.ALLOW.value:
+                    return True, False
+                else:
+                    maybe_challenger.debug_message("Challenge or allow the action please")
+                    return False, None
+
+            challenge = self._extort_a_correct_command_with_threat_of_violence(closure_block, maybe_challenger)
+            # Since we're kind of in the middle of logic, handle player dying because of idiocy here
+            if challenge is None:
+                self._handle_dead_players_in_the_middle_of_actions(other_players)
+
+            if challenge == False:
+                continue
+
+            if challenge == True:
+                def closure_block():
+                    what_do = get_just_data_from_socket(
+                        self.connection.send_and_receive(YOUR_ACTION_IS_CHALLENGED, action.name, target_number,
+                                                         maybe_challenger.number)
+                    )[0]
+                    if what_do == YouAreChallengedDecision.CONCEDE.value:
+                        return True, what_do
+                    elif what_do == YouAreChallengedDecision.REVEAL_CARD.value:
+                        required_card = action.requires_card[0]
+                        if required_card in self.cards:
+                            return True, what_do
+                        else:
+                            self.debug_message("You don't have the card to reveal. Concede.")
+                            return False, None
+                    else:
+                        self.debug_message("Choose to concede or reveal please")
+                        return False, None
+
+                what_did = self._extort_a_correct_command_with_threat_of_violence(closure_block, self)
+
+                if what_did == YouAreChallengedDecision.REVEAL_CARD.value:
+                    challenge_success = False
+                    life_loser = maybe_challenger
+
+                    card = action.requires_card[0]
+                    self.remove_card(card)
+                    deck.append(card)
+                    random.shuffle(deck)
+                    self.give_card(deck.pop())
+
+                else:
+                    challenge_success = True
+                    life_loser = self
+
+                def dead_chooser_closure():
+                    killed = get_just_data_from_socket(life_loser.connection.send_and_receive(CHOOSE_CARD_TO_KILL))[0]
+                    if killed not in life_loser.cards:
+                        print(killed, life_loser.cards)
+                        life_loser.debug_message("You don't have that card")
+                        return False, None
+                    life_loser.remove_card(killed)
+                    self._log_challenge_result(action, target_number, maybe_challenger.number, challenge_success)
+                    return True, None
+
+                self._extort_a_correct_command_with_threat_of_violence(dead_chooser_closure, life_loser)
+
+                # Challenge not successful => action may continue
+                return not challenge_success
+
+        # No challenges, return
         return True
 
     def _handle_steal(self, target_num, other_players):
@@ -339,8 +464,8 @@ class Game:
 
     def setup_player(self, player):
         random.shuffle(self.deck)
-        player.give_card(self.deck.pop())
-        player.give_card(self.deck.pop())
+        player.give_card(Card.ASSASSIN)#player.give_card(self.deck.pop())
+        player.give_card(Card.CONTESSA) #player.give_card(self.deck.pop())
         player.give_money(2)
         for other in self.players.values():
             if player.number != other.number:
@@ -362,7 +487,6 @@ class Game:
             for d in newly_dead:
                 debug_print(f"Player {d.number} is dead")
                 for p in self.players.values():
-                    print(f"Sending to {p}")
                     p.a_player_is_dead(d)
             self.alive_players = [p for p in self.alive_players[1:] + [self.alive_players[0]] if len(p.cards)]
 

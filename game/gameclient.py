@@ -71,15 +71,15 @@ class PlayerClient:
                     self.connection.send(decision)
                 elif command == DO_YOU_BLOCK:
                     action, taken_by = all_actions_map()[params[0]], int(params[1])
-                    decision, blocker = self.logic.do_you_block(action, taken_by)
-                    self.connection.send(decision, blocker)
+                    decision, block_card = self.logic.do_you_block(action, taken_by)
+                    self.connection.send(decision, block_card)
                 elif command == DO_YOU_CHALLENGE_ACTION:
                     action, taken_by, target = all_actions_map()[params[0]], int(params[1]), int(params[2])
                     decision = self.logic.do_you_challenge_action(action, taken_by, target)
                     self.connection.send(decision)
                 elif command == DO_YOU_CHALLENGE_BLOCK:
-                    action, taken_by, target, blocker = all_actions_map()[params[0]], int(params[1]), int(params[2]), params[3]
-                    decision = self.logic.do_you_challenge_block(action, taken_by, target, blocker)
+                    action, taken_by, target, block_card, blocker = all_actions_map()[params[0]], int(params[1]), int(params[2]), params[3], int(params[4])
+                    decision = self.logic.do_you_challenge_block(action, taken_by, target, block_card, blocker)
                     self.connection.send(decision)
 
                 # Log
@@ -87,18 +87,18 @@ class PlayerClient:
                     action, taken_by, target = all_actions_map()[params[0]], int(params[1]), int(params[2])
                     self.logic.action_was_taken(action, taken_by, target)
                 elif command == ACTION_WAS_BLOCKED:
-                    action, taken_by, target, blocker = all_actions_map()[params[0]], int(params[1]), int(params[2]), params[3]
-                    self.logic.action_was_blocked(action, taken_by, target, blocker)
+                    action, taken_by, target, block_card, blocker = all_actions_map()[params[0]], int(params[1]), int(params[2]), params[3], int(params[4])
+                    self.logic.action_was_blocked(action, taken_by, target, block_card, blocker)
                 elif command == ACTION_WAS_CHALLENGED:
                     action, taken_by, target, challenger, success = (
                         all_actions_map()[params[0]], int(params[1]), int(params[2]), int(params[3]), params[4] == "True"
                     )
                     self.logic.action_was_challenged(action, taken_by, target, challenger, success)
                 elif command == BLOCK_WAS_CHALLENGED:
-                    action, taken_by, target, blocker, challenger, success = (
-                        all_actions_map()[params[0]], int(params[1]), int(params[2]), params[3], int(params[4]), params[5] == "True"
+                    action, taken_by, target, block_card, blocker, challenger, success = (
+                        all_actions_map()[params[0]], int(params[1]), int(params[2]), params[3], int(params[4]), int(params[5]), params[6] == "True"
                     )
-                    self.logic.block_was_challenged(action, taken_by, target, blocker, challenger, success)
+                    self.logic.block_was_challenged(action, taken_by, target, block_card, blocker, challenger, success)
                 elif command == PLAYER_LOST_A_CARD:
                     player, card = int(params[0]), params[1]
                     self.logic.player_lost_a_card(player, card)

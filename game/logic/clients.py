@@ -73,7 +73,7 @@ class ClientLogic:
         raise NotImplementedError()
 
     @abstractmethod
-    def do_you_challenge_block(self, action: Action, taken_by: int, target: int, blocker: Card) -> DoYouChallengeDecision:
+    def do_you_challenge_block(self, action: Action, taken_by: int, target: int, block_card: Card, blocker: int) -> DoYouChallengeDecision:
         raise NotImplementedError()
 
     # Log
@@ -82,7 +82,7 @@ class ClientLogic:
         raise NotImplementedError()
 
     @abstractmethod
-    def action_was_blocked(self, action: Action, taken_by: int, target: int, blocker: Card):
+    def action_was_blocked(self, action: Action, taken_by: int, target: int, block_card: Card, blocker: int):
         raise NotImplementedError()
 
     @abstractmethod
@@ -90,7 +90,7 @@ class ClientLogic:
         raise NotImplementedError()
 
     @abstractmethod
-    def block_was_challenged(self, action: Action, taken_by: int, target: int, blocker: Card, challenger: int, successful: bool):
+    def block_was_challenged(self, action: Action, taken_by: int, target: int, block_card: Card, blocker: int, challenger: int, successful: bool):
         raise NotImplementedError()
 
     @abstractmethod
@@ -184,7 +184,7 @@ class ExtremelySimpleTestClient(ClientLogic):
             return DoYouChallengeDecision.ALLOW
 
     def do_you_challenge_block(self, action: Action, taken_by: int, target: int,
-                               blocker: Card) -> DoYouChallengeDecision:
+                               block_card: Card, blocker: int) -> DoYouChallengeDecision:
         if taken_by == self.number:
             return DoYouChallengeDecision.CHALLENGE
         else:
@@ -194,16 +194,16 @@ class ExtremelySimpleTestClient(ClientLogic):
     def action_was_taken(self, action: Action, taken_by: int, target: int):
         print(f"Action {action.name} was successfully taken by {taken_by} towards {target}")
 
-    def action_was_blocked(self, action: Action, taken_by: int, target: int, blocker: Card):
-        print(f"Action {action.name} was taken by {taken_by} to {target} and blocked with {blocker}")
+    def action_was_blocked(self, action: Action, taken_by: int, target: int, block_card: Card, blocker: int):
+        print(f"Action {action.name} was taken by {taken_by} to {target} and blocked with {blocker} by {blocker}")
 
     def action_was_challenged(self, action: Action, taken_by: int, target: int, challenger: int, successful: bool):
         print(f"Action {action.name} was taken by {taken_by} to {target} and challenged by {challenger} with success {successful}")
 
-    def block_was_challenged(self, action: Action, taken_by: int, target: int, blocker: Card, challenger: int,
+    def block_was_challenged(self, action: Action, taken_by: int, target: int, block_card: Card, blocker: int, challenger: int,
                              successful: bool):
         print(
-            f"Action {action.name} was taken by {taken_by} to {target} and blocked by {blocker} which was challenged by {challenger} with success {successful}")
+            f"Action {action.name} was taken by {taken_by} to {target} and blocked by {blocker} with {block_card} which was challenged by {challenger} with success {successful}")
 
     def player_lost_a_card(self, player: int, card: Card):
         print(f"Player {player} lost a card and revealed {card}")
