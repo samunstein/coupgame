@@ -16,13 +16,15 @@ PLAYER_DEAD = "player_dead"
 
 # Turn flow
 TAKE_TURN = "take_turn"
-CHALLENGED = "challenged"
-BLOCK_CHALLENGED = "block_challenged"
-ASK_BLOCK = "ask_block"
+YOUR_ACTION_IS_CHALLENGED = "challenged"
+YOUR_BLOCK_IS_CHALLENGED = "block_challenged"
+DO_YOU_BLOCK = "ask_block"
+DO_YOU_CHALLENGE_ACTION = "ask_challenge"
+DO_YOU_CHALLENGE_BLOCK = "ask_challenge_block"
 
 # Log of what has happened
-ACTION_TAKEN = "action_taken"
-ACTION_BLOCKED = "action_blocked"
-ACTION_CHALLENGED = "challenge_result"
-BLOCK_CHALLENGE_RESULT = "block_challenge_result"
+ACTION_WAS_TAKEN = "action_taken"
+ACTION_WAS_BLOCKED = "action_blocked"
+ACTION_WAS_CHALLENGED = "challenge_result"
+BLOCK_WAS_CHALLENGED = "block_challenge_result"
 CARD_DEAD = "card_dead"
