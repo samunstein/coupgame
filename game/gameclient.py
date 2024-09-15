@@ -35,7 +35,8 @@ class PlayerClient:
                 elif command == DEBUG_MESSAGE:
                     debug_print(params[0])
                 elif command == TAKE_TURN:
-                    print("TODO: Tee jotain :D")
+                    action, target = self.logic.take_turn()
+                    self.connection.send(action, target)
                 elif command == SET_PLAYER_NUMBER:
                     self.logic.set_number(int(params[0]))
                 elif command == ADD_OPPONENT:
