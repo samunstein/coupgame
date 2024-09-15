@@ -136,13 +136,16 @@ class ExtremelySimpleTestClient(ClientLogic):
         print(f"Given {m} money")
 
     def remove_card(self, c: Card):
+        print(f"Removing {c}")
         self.cards.remove(c)
 
     # Card decisions
     def choose_ambassador_cards_to_remove(self) -> (Card, Card):
+        print(f"Choosing {self.cards[0:2]} to shuffle by ambassador")
         return self.cards[0], self.cards[1]
 
     def choose_card_to_kill(self) -> Card:
+        print(f"Choosing {self.cards[0]} to kill")
         return self.cards[0]
 
     # Turn flow
@@ -153,11 +156,19 @@ class ExtremelySimpleTestClient(ClientLogic):
             return Action.INCOME, self.number
 
     def your_action_is_challenged(self, action: Action, target: int, challenger: int) -> YouAreChallengedDecision:
-        return YouAreChallengedDecision.REVEAL_CARD
+        if action.requires_card[0] in self.cards:
+            print("Revealing card to challenge")
+            return YouAreChallengedDecision.REVEAL_CARD
+        else:
+            print("Conceding to challenge")
+            return YouAreChallengedDecision.CONCEDE
 
     def your_block_is_challenged(self, action: Action, taken_by: int, blocker: Card,
                                  challenged_by: int) -> YouAreChallengedDecision:
-        return YouAreChallengedDecision.REVEAL_CARD
+        if blocker in self.cards:
+            return YouAreChallengedDecision.REVEAL_CARD
+        else:
+            return YouAreChallengedDecision.CONCEDE
 
     def do_you_block(self, action: Action, taken_by: int) -> (DoYouBlockDecision, Card):
         can_block_with = set(action.blocked_by).intersection(set(self.cards))

@@ -1,7 +1,4 @@
-import enum
-
-
-class Card(enum.Enum):
+class Card:
     DUKE = "duke"
     CONTESSA = "contessa"
     ASSASSIN = "assassin"
@@ -9,4 +6,4 @@ class Card(enum.Enum):
     AMBASSADOR = "ambassador"
 
 def all_cards():
-    return [c.value for c in Card]
+    return [Card.DUKE, Card.CONTESSA, Card.ASSASSIN, Card.CAPTAIN, Card.AMBASSADOR]

@@ -15,7 +15,7 @@ class PlayerClient:
     def run(self):
         while True:
             data = self.connection.receive()
-            debug_print(f"Received {data}")
+            debug_print(f"# RAW DATA RECEIVED: {data}")
             if not len(data):
                 break
 
@@ -91,12 +91,12 @@ class PlayerClient:
                     self.logic.action_was_blocked(action, taken_by, target, blocker)
                 elif command == ACTION_WAS_CHALLENGED:
                     action, taken_by, target, challenger, success = (
-                        all_actions_map()[params[0]], int(params[1]), int(params[2]), int(params[3]), bool(params[4])
+                        all_actions_map()[params[0]], int(params[1]), int(params[2]), int(params[3]), params[4] == "True"
                     )
                     self.logic.action_was_challenged(action, taken_by, target, challenger, success)
                 elif command == BLOCK_WAS_CHALLENGED:
                     action, taken_by, target, blocker, challenger, success = (
-                        all_actions_map()[params[0]], int(params[1]), int(params[2]), params[3], int(params[4]), bool(params[5])
+                        all_actions_map()[params[0]], int(params[1]), int(params[2]), params[3], int(params[4]), params[5] == "True"
                     )
                     self.logic.block_was_challenged(action, taken_by, target, blocker, challenger, success)
                 elif command == PLAYER_LOST_A_CARD:
