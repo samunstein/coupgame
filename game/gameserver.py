@@ -1,6 +1,6 @@
 import random
 
-from common.common import debug_print, commands_params, get_just_data_from_socket
+from common.common import debug_print, read_command_params, get_just_data_from_socket
 from config import PARAM_SPLITTER, CONTROL_CHAR_REPLACE, EACH_CARD_IN_DECK, WRONG_MESSAGE_TOLERANCE
 from connection.common import OpenSocket
 from game.enums.actions import all_actions_map, Action, DoYouChallengeDecision, YouAreChallengedDecision, \
@@ -412,7 +412,7 @@ class Player:
         self.give_card(deck.pop())
 
         def closure_block():
-            d1, d2 = commands_params(self.connection.send_and_receive(CHOOSE_AMBASSADOR_CARDS_TO_REMOVE))[0]
+            d1, d2 = read_command_params(self.connection.send_and_receive(CHOOSE_AMBASSADOR_CARDS_TO_REMOVE))[0]
             cards = [d1] + d2
             if len(cards) != 2:
                 self.debug_message("Choose 2 cards")
@@ -444,7 +444,7 @@ class Player:
         debug_print(f"Player {self} taking turn")
 
         def closure_block():
-            action, target_number = commands_params(self.connection.send_and_receive(TAKE_TURN))[0]
+            action, target_number = read_command_params(self.connection.send_and_receive(TAKE_TURN))[0]
             target_number = int(target_number[0])
 
             debug_print(f"Player {self} attempting {action} on {target_number}")

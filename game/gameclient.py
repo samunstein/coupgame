@@ -1,6 +1,6 @@
 from abc import abstractmethod
 
-from common.common import debug_print, commands_params
+from common.common import debug_print, read_command_params
 from config import PARAM_SPLITTER, CONTROL_CHAR_REPLACE, COMMAND_END
 from connection.common import Connection
 from game.enums.actions import all_actions_map
@@ -108,7 +108,7 @@ class PlayerClient:
             if not len(data):
                 break
 
-            commands = commands_params(data)
+            commands = read_command_params(data)
 
             for command_data in commands:
                 command, params = command_data

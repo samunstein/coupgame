@@ -5,7 +5,10 @@ def debug_print(msg):
     if DEBUG:
         print(msg)
 
-def commands_params(raw_data: str):
+def make_command_params(*values):
+    return PARAM_SPLITTER.join([str(v) for v in values]) + COMMAND_END
+
+def read_command_params(raw_data: str):
     commands = raw_data.rstrip(COMMAND_END).split(COMMAND_END)
     return [(cd.split(PARAM_SPLITTER)[0], cd.split(PARAM_SPLITTER)[1:]) for cd in commands]
 
