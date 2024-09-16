@@ -136,8 +136,8 @@ class ExtremelySimpleTestClient(ClientLogic):
         print(f"Given {m} money")
 
     def remove_card(self, c: Card):
-        print(f"Removing {c}")
         self.cards.remove(c)
+        print(f"Removing {c}. Cards now {self.cards}")
 
     # Card decisions
     def choose_ambassador_cards_to_remove(self) -> (Card, Card):
@@ -151,13 +151,15 @@ class ExtremelySimpleTestClient(ClientLogic):
     # Turn flow
     def take_turn(self) -> (Action, int):
         if self.money >= 3:
+            print("Taking action assassinate")
             return Action.ASSASSINATE, list(self.opponents.keys())[0]
         else:
+            print("Taking action income")
             return Action.INCOME, self.number
 
     def your_action_is_challenged(self, action: Action, target: int, challenger: int) -> YouAreChallengedDecision:
         if action.requires_card[0] in self.cards:
-            print("Revealing card to challenge")
+            print(f"Revealing card {action.requires_card[0]} to challenge")
             return YouAreChallengedDecision.REVEAL_CARD
         else:
             print("Conceding to challenge")
@@ -166,44 +168,52 @@ class ExtremelySimpleTestClient(ClientLogic):
     def your_block_is_challenged(self, action: Action, taken_by: int, blocker: Card,
                                  challenged_by: int) -> YouAreChallengedDecision:
         if blocker in self.cards:
+            print("My block is challenged. I have the blocker though")
             return YouAreChallengedDecision.REVEAL_CARD
         else:
+            print("My block is challenged. I admit I don't have the blocker")
             return YouAreChallengedDecision.CONCEDE
 
     def do_you_block(self, action: Action, taken_by: int) -> (DoYouBlockDecision, Card):
         can_block_with = set(action.blocked_by).intersection(set(self.cards))
         if len(can_block_with):
+            print(f"I block the {action.name} from {taken_by}")
             return DoYouBlockDecision.BLOCK, can_block_with.pop()
         else:
+            print(f"I don't block the {action.name} from {taken_by}")
             return DoYouBlockDecision.NO_BLOCK, ""
 
     def do_you_challenge_action(self, action: Action, taken_by: int, target: int) -> DoYouChallengeDecision:
         if target == self.number:
+            print(f"I challenge the {action.name} from {taken_by} to {target}")
             return DoYouChallengeDecision.CHALLENGE
         else:
+            print(f"I don't challenge the {action.name} from {taken_by} to {target}")
             return DoYouChallengeDecision.ALLOW
 
     def do_you_challenge_block(self, action: Action, taken_by: int, target: int,
                                block_card: Card, blocker: int) -> DoYouChallengeDecision:
         if taken_by == self.number:
+            print(f"I challenge the block of {action.name} from {taken_by} to {target} with {block_card} by {blocker}")
             return DoYouChallengeDecision.CHALLENGE
         else:
+            print(f"I don't challenge the block of {action.name} from {taken_by} to {target} with {block_card} by {blocker}")
             return DoYouChallengeDecision.ALLOW
 
     # Log
     def action_was_taken(self, action: Action, taken_by: int, target: int):
-        print(f"Action {action.name} was successfully taken by {taken_by} towards {target}")
+        print(f"Log: Action {action.name} was successfully taken by {taken_by} towards {target}")
 
     def action_was_blocked(self, action: Action, taken_by: int, target: int, block_card: Card, blocker: int):
-        print(f"Action {action.name} was taken by {taken_by} to {target} and blocked with {blocker} by {blocker}")
+        print(f"Log: Action {action.name} was blocked with {blocker} by {blocker}. Taken by {taken_by} to {target}.")
 
     def action_was_challenged(self, action: Action, taken_by: int, target: int, challenger: int, successful: bool):
-        print(f"Action {action.name} was taken by {taken_by} to {target} and challenged by {challenger} with success {successful}")
+        print(f"Log: Action {action.name} was challenged by {challenger} with success {successful}. Taken by {taken_by} to {target}")
 
     def block_was_challenged(self, action: Action, taken_by: int, target: int, block_card: Card, blocker: int, challenger: int,
                              successful: bool):
         print(
-            f"Action {action.name} was taken by {taken_by} to {target} and blocked by {blocker} with {block_card} which was challenged by {challenger} with success {successful}")
+            f"Log: Action {action.name} block with {block_card} by {blocker} was challenged by {challenger} with success {successful}. Taken by {taken_by} to {target}")
 
     def player_lost_a_card(self, player: int, card: Card):
         print(f"Player {player} lost a card and revealed {card}")

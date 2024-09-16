@@ -15,7 +15,7 @@ class PlayerClient:
     def run(self):
         while True:
             data = self.connection.receive()
-            debug_print(f"# RAW DATA RECEIVED: {data}")
+            # debug_print(f"# RAW DATA RECEIVED: {data}")
             if not len(data):
                 break
 
