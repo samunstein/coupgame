@@ -14,6 +14,7 @@ def get_connections(amount):
     while len(socks) < amount:
         debug_print("Accepting")
         connect, address = sock.accept()
+        connect.settimeout(10)
         socks.append(OpenSocket(connect))
 
     return socks

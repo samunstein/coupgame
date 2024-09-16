@@ -1,5 +1,4 @@
 import random
-from tokenize import maybe
 
 from common.common import debug_print, commands_params, get_just_data_from_socket
 from config import PARAM_SPLITTER, CONTROL_CHAR_REPLACE, EACH_CARD_IN_DECK, WRONG_MESSAGE_TOLERANCE
@@ -37,7 +36,7 @@ class Player:
                     break
             else:
                 self.emergency_kill(one_responsible)
-        except TimeoutError as e:
+        except TimeoutError:
             debug_print(f"Player {one_responsible} took too long and timed out")
             self.emergency_kill(one_responsible)
         return retval
@@ -493,8 +492,6 @@ class Player:
 
 class Game:
     def __init__(self, connections):
-        for c in connections:
-            c.connection.settimeout(10)
         self.players = {i: Player(i, c) for i, c in enumerate(connections)}
         for p in self.players.values():
             p.player_number(p.number)
@@ -505,36 +502,45 @@ class Game:
         for c in all_cards():
             self.deck.extend(EACH_CARD_IN_DECK * [c])
 
-    def setup_player(self, player):
+    def _setup_player(self, player):
         random.shuffle(self.deck)
         player.give_card(Card.ASSASSIN)  # player.give_card(self.deck.pop())
-        player.give_card(Card.DUKE)  # player.give_card(self.deck.pop())
+        player.give_card(Card.CONTESSA)  # player.give_card(self.deck.pop())
         player.give_money(2)
         for other in self.players.values():
             if player.number != other.number:
                 player.add_opponent(other.number, other.name)
 
-    def run(self):
+    def setup_players(self):
         for p in self.players.values():
-            self.setup_player(p)
+            self._setup_player(p)
 
         for p in self.players.values():
             p.set_all_players(self.players.values())
 
+    # Returns whether the game has ended
+    def run_one_turn(self) -> bool:
+        taking_action = self.alive_players[0]
+        taking_action.take_turn({p.number: p for p in self.alive_players[1:]}, self.deck)
+
+        # Eliminate players, and rotate turn
+        newly_dead = [p for p in self.alive_players if not len(p.cards)]
+        for d in newly_dead:
+            debug_print(f"Player {d.number} is dead")
+            for p in self.players.values():
+                p.a_player_is_dead(d)
+        self.alive_players = [p for p in self.alive_players[1:] + [self.alive_players[0]] if len(p.cards)]
+
+        if len(self.alive_players) == 1:
+            debug_print(f"Winner is {self.alive_players[0]}!")
+            for p in self.players.values():
+                p.shutdown()
+            return True
+        return False
+
+    def run(self):
+        self.setup_players()
         while True:
-            taking_action = self.alive_players[0]
-            taking_action.take_turn({p.number: p for p in self.alive_players[1:]}, self.deck)
-
-            # Eliminate players, and rotate turn
-            newly_dead = [p for p in self.alive_players if not len(p.cards)]
-            for d in newly_dead:
-                debug_print(f"Player {d.number} is dead")
-                for p in self.players.values():
-                    p.a_player_is_dead(d)
-            self.alive_players = [p for p in self.alive_players[1:] + [self.alive_players[0]] if len(p.cards)]
-
-            if len(self.alive_players) == 1:
-                debug_print(f"Winner is {self.alive_players[0]}!")
-                for p in self.players.values():
-                    p.shutdown()
+            if self.run_one_turn():
                 break
+

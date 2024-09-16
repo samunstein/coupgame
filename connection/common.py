@@ -1,9 +1,27 @@
 import socket
+from abc import abstractmethod
 
 from config import PARAM_SPLITTER, COMMAND_END
 
+class Connection:
+    @abstractmethod
+    def send(self, *msg):
+        raise NotImplementedError()
 
-class OpenSocket:
+    @abstractmethod
+    def receive(self):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def send_and_receive(self, *msg):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def close(self, *msg):
+        raise NotImplementedError()
+
+
+class OpenSocket(Connection):
     @classmethod
     def new(cls, host, port):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
