@@ -4,6 +4,7 @@ from common.common import make_command_params
 from config import PARAM_SPLITTER, COMMAND_END
 from connection.common import Connection
 from game.gameclient import PlayerClient
+from game.logic.clients import ClientLogic
 
 
 class ServerMockConnection(Connection):
@@ -41,3 +42,6 @@ class DummyConnection(Connection):
 
     def close(self):
         pass
+
+def get_server_mock_connection(logic: ClientLogic) -> ServerMockConnection:
+    return ServerMockConnection(PlayerClient(DummyConnection(), logic))

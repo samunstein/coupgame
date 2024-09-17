@@ -2,7 +2,7 @@ import random
 
 from common.common import debug_print, read_command_params, get_just_data_from_socket
 from config import PARAM_SPLITTER, CONTROL_CHAR_REPLACE, EACH_CARD_IN_DECK, WRONG_MESSAGE_TOLERANCE
-from connection.common import OpenSocket
+from connection.common import Connection
 from game.enums.actions import all_actions_map, Action, DoYouChallengeDecision, YouAreChallengedDecision, \
     DoYouBlockDecision
 from game.enums.cards import all_cards, Card
@@ -10,7 +10,7 @@ from game.enums.commands import *
 
 
 class Player:
-    def __init__(self, number: int, connection: OpenSocket):
+    def __init__(self, number: int, connection: Connection):
         self.cards = []
         self.money = 0
         self.connection = connection
@@ -90,24 +90,24 @@ class Player:
         return True
 
     def _log_successful_action_result(self, action, target_num):
-        debug_print(f"{action.name} taken by {self} on {target_num} successful")
+        debug_print(f"{action.name} taken by {self.number} on {target_num} successful")
         for p in self.all_players:
             p.connection.send(ACTION_WAS_TAKEN, action.name, self.number, target_num)
 
     def _log_block_result(self, action, target_num, blocked_with):
-        debug_print(f"{action.name} taken by {self} on {target_num} blocked with {blocked_with}")
+        debug_print(f"{action.name} blocked with {blocked_with}. Taken by {self.number} on {target_num}")
         for p in self.all_players:
             p.connection.send(ACTION_WAS_BLOCKED, action.name, self.number, target_num, blocked_with)
 
     def _log_challenge_result(self, action, target_num, challenger_num, successful):
         debug_print(
-            f"{action.name} taken by {self} on {target_num} challenged by {challenger_num} with success {successful}")
+            f"{action.name} challenged by {challenger_num} with success {successful}. Taken by {self.number} on {target_num}")
         for p in self.all_players:
             p.connection.send(ACTION_WAS_CHALLENGED, action.name, self.number, target_num, challenger_num, successful)
 
     def _log_block_challenge_result(self, action, target_num, blocked_with, blocker_num, challenger_num, successful):
         debug_print(
-            f"Blocking with {blocked_with} by {blocker_num} the {action.name} taken by {self} on {target_num} challenged by {challenger_num} with success {successful}")
+            f"Blocking with {blocked_with} by {blocker_num} the {action.name} taken by {self.number} on {target_num} challenged by {challenger_num} with success {successful}")
         for p in self.all_players:
             p.connection.send(BLOCK_WAS_CHALLENGED, action.name, self.number, target_num,  blocked_with, blocker_num, challenger_num,
                               successful)
@@ -491,7 +491,7 @@ class Player:
 
 
 class Game:
-    def __init__(self, connections):
+    def __init__(self, connections: list[Connection], deck: list[Card] | None = None):
         self.players = {i: Player(i, c) for i, c in enumerate(connections)}
         for p in self.players.values():
             p.player_number(p.number)
@@ -499,13 +499,16 @@ class Game:
         debug_print(f"Players {[p.name for p in self.players.values()]} joined.")
         self.alive_players = list(self.players.values())
         self.deck = []
-        for c in all_cards():
-            self.deck.extend(EACH_CARD_IN_DECK * [c])
+        if deck is None:
+            for c in all_cards():
+                self.deck.extend(EACH_CARD_IN_DECK * [c])
+        else:
+            self.deck = deck
 
     def _setup_player(self, player):
         random.shuffle(self.deck)
-        player.give_card(Card.ASSASSIN)  # player.give_card(self.deck.pop())
-        player.give_card(Card.CONTESSA)  # player.give_card(self.deck.pop())
+        player.give_card(self.deck.pop())
+        player.give_card(self.deck.pop())
         player.give_money(2)
         for other in self.players.values():
             if player.number != other.number:
