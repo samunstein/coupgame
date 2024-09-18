@@ -143,13 +143,13 @@ class Player:
             self._handle_dead_players_in_the_middle_of_actions(other_players)
 
             # Target died of idiocy. Action cannot continue
-            if target_number not in other_players:
+            if action.targeted and target_number not in other_players:
                 return False
 
-            if challenge == False:
+            if challenge is False:
                 continue
 
-            if challenge == True:
+            if challenge is True:
                 def closure_block():
                     what_do = get_just_data_from_socket(
                         self.connection.send_and_receive(YOUR_ACTION_IS_CHALLENGED, action.name, target_number,
@@ -232,9 +232,6 @@ class Player:
                 decision_, card_ = data
 
                 if decision_ == DoYouBlockDecision.BLOCK.value:
-                    if card_ not in maybe_blocker.cards:
-                        maybe_blocker.debug_message("You don't have that block card")
-                        return False, None
                     return True, (True, card_)
                 elif decision_ == DoYouBlockDecision.NO_BLOCK.value:
                     return True, (False, None)
@@ -247,7 +244,7 @@ class Player:
             self._handle_dead_players_in_the_middle_of_actions(other_players)
 
             # Target died of idiocy. Action cannot continue
-            if target_number not in other_players:
+            if action.targeted and target_number not in other_players:
                 return False
 
             decision, card = block_decision
@@ -283,7 +280,7 @@ class Player:
 
             self._handle_dead_players_in_the_middle_of_actions(other_players)
 
-            if target_num not in other_players or not len(self.cards):
+            if (action.targeted and target_num not in other_players) or not len(self.cards):
                 # Action may not continue if one of the participants died of idiocy
                 return False
 
@@ -326,7 +323,7 @@ class Player:
 
                 else:
                     challenge_success = True
-                    life_loser = self
+                    life_loser = blocker_player
 
                 def dead_chooser_closure():
                     killed = get_just_data_from_socket(life_loser.connection.send_and_receive(CHOOSE_CARD_TO_KILL))[0]
@@ -343,7 +340,7 @@ class Player:
                 self._extort_a_correct_command_with_threat_of_violence(dead_chooser_closure, life_loser)
 
                 # An action participant died of idiocy.
-                if not len(self.cards) or target_num not in other_players:
+                if not len(self.cards) or (action.targeted and target_num not in other_players):
                     return False
 
                 # Challenge successful => no block => action may continue

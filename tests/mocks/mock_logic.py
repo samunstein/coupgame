@@ -4,7 +4,7 @@ from game.logic.clients import ClientLogic
 
 
 class MockLogic(ClientLogic):
-    def __init__(self, action: lambda self: (Action, int), challenge: bool, block: bool):
+    def __init__(self, action: lambda self: (Action, int), challenge: bool, block: bool, challenge_block: bool):
         self.opponents = []
         self.cards = []
         self.number = -1
@@ -12,6 +12,7 @@ class MockLogic(ClientLogic):
         self.action = action
         self.challenge = challenge
         self.block = block
+        self.challenge_block = challenge_block
         self.money = 0
 
     def shutdown(self):
@@ -33,7 +34,7 @@ class MockLogic(ClientLogic):
         self.money += m
 
     def remove_card(self, c: Card):
-        pass
+        self.cards.remove(c)
 
     def choose_card_to_kill(self) -> Card:
         return self.cards[-1]
@@ -65,7 +66,7 @@ class MockLogic(ClientLogic):
 
     def do_you_challenge_block(self, action: Action, taken_by: int, target: int, block_card: Card,
                                blocker: int) -> DoYouChallengeDecision:
-        return DoYouChallengeDecision.CHALLENGE if self.challenge else DoYouChallengeDecision.ALLOW
+        return DoYouChallengeDecision.CHALLENGE if self.challenge_block else DoYouChallengeDecision.ALLOW
 
     def action_was_taken(self, action: Action, taken_by: int, target: int):
         pass
@@ -87,4 +88,4 @@ class MockLogic(ClientLogic):
         pass
 
     def debug_message(self, msg: str):
-        pass
+        print(f"Debug: {msg}")
