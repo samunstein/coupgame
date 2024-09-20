@@ -12,7 +12,7 @@ def get_connections(amount):
     socks = []
 
     while len(socks) < amount:
-        debug_print("Accepting")
+        debug_print("Waiting for connection...")
         connect, address = sock.accept()
         connect.settimeout(10)
         socks.append(OpenSocket(connect))

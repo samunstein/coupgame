@@ -1,37 +1,36 @@
 import unittest
 from unittest import TestCase
 
-from game.enums.actions import Action
-from game.enums.cards import Card
-from game.gameclient import PlayerClient
+from game.enums.cards import Duke, Captain
 from game.gameserver import Game
-from game.logic.clients import ClientLogic
+from game.messages.responses import TaxDecision, ForeignAidDecision
 from tests.mocks.mock_connection import get_server_mock_connection
 from tests.mocks.mock_logic import MockLogic
+
 
 class Methods:
     @staticmethod
     def tax_if_duke_or_fa(self: MockLogic):
-        if Card.DUKE in self.cards:
-            return Action.TAX, self.number
+        if Duke() in self.cards:
+            return TaxDecision()
         else:
-            return Action.FOREIGN_AID, self.number
+            return ForeignAidDecision()
 
     @staticmethod
     def always_fa(self: MockLogic):
-        return Action.FOREIGN_AID, self.number
+        return ForeignAidDecision()
 
     @staticmethod
     def one_player_with_dukes_other_not(game):
-        game.players[1].remove_card(Card.DUKE)
-        game.players[1].remove_card(Card.DUKE)
-        game.players[1].give_card(Card.CAPTAIN)
-        game.players[1].give_card(Card.CAPTAIN)
+        game.players[1].remove_card(Duke())
+        game.players[1].remove_card(Duke())
+        game.players[1].give_card(Captain())
+        game.players[1].give_card(Captain())
 
 class DukeTest(TestCase, Methods):
     def test_basic_no_blocks(self):
         clients = [get_server_mock_connection(MockLogic(Methods.tax_if_duke_or_fa, False, False, False)) for _ in range(2)]
-        game = Game(clients, deck=[Card.DUKE] * 4)
+        game = Game(clients, deck=[Duke()] * 4)
         game.setup_players()
         Methods.one_player_with_dukes_other_not(game)
 
@@ -42,7 +41,7 @@ class DukeTest(TestCase, Methods):
 
     def test_challenge(self):
         clients = [get_server_mock_connection(MockLogic(Methods.tax_if_duke_or_fa, True, False, False)) for _ in range(2)]
-        game = Game(clients, deck=[Card.DUKE] * 4)
+        game = Game(clients, deck=[Duke()] * 4)
         game.setup_players()
         Methods.one_player_with_dukes_other_not(game)
 
@@ -52,7 +51,7 @@ class DukeTest(TestCase, Methods):
 
     def test_block(self):
         clients = [get_server_mock_connection(MockLogic(Methods.tax_if_duke_or_fa, False, True, False)) for _ in range(2)]
-        game = Game(clients, deck=[Card.CAPTAIN] * 4)
+        game = Game(clients, deck=[Captain()] * 4)
         game.setup_players()
 
         game.run_one_turn()
@@ -60,7 +59,7 @@ class DukeTest(TestCase, Methods):
 
     def test_block_challenge(self):
         clients = [get_server_mock_connection(MockLogic(Methods.always_fa, True, True, True)) for _ in range(2)]
-        game = Game(clients, deck=[Card.DUKE] * 4)
+        game = Game(clients, deck=[Duke()] * 4)
         game.setup_players()
         Methods.one_player_with_dukes_other_not(game)
 

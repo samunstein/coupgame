@@ -1,6 +1,8 @@
-from game.enums.actions import Action, DoYouChallengeDecision, DoYouBlockDecision, YouAreChallengedDecision
+from game.enums.actions import Action
 from game.enums.cards import Card
 from game.logic.clients import ClientLogic
+from game.messages.responses import RevealCard, Concede, YouAreChallengedDecision, Block, NoBlock, DoYouBlockDecision, \
+    DoYouChallengeDecision, Challenge, Allow
 
 
 class MockLogic(ClientLogic):
@@ -28,6 +30,7 @@ class MockLogic(ClientLogic):
         self.number = num
 
     def add_card(self, c: Card):
+        print("Adding", c)
         self.cards.append(c)
 
     def change_money(self, m: int):
@@ -47,28 +50,28 @@ class MockLogic(ClientLogic):
 
     def your_action_is_challenged(self, action: Action, target: int, challenger: int) -> YouAreChallengedDecision:
         if action.requires_card[0] in self.cards:
-            return YouAreChallengedDecision.REVEAL_CARD
+            return RevealCard()
         else:
-            return YouAreChallengedDecision.CONCEDE
+            return Concede()
 
     def your_block_is_challenged(self, action: Action, taken_by: int, blocker: Card,
                                  challenged_by: int) -> YouAreChallengedDecision:
         if blocker in self.cards:
-            return YouAreChallengedDecision.REVEAL_CARD
+            return RevealCard()
         else:
-            return YouAreChallengedDecision.CONCEDE
+            return Concede()
 
-    def do_you_block(self, action: Action, taken_by: int) -> (DoYouBlockDecision, Card):
+    def do_you_block(self, action: Action, taken_by: int) -> DoYouBlockDecision:
         have_block_card = set(self.cards).intersection(set(action.blocked_by))
         block_card = have_block_card.pop() if have_block_card else action.blocked_by[0]
-        return (DoYouBlockDecision.BLOCK, block_card) if self.block else (DoYouBlockDecision.NO_BLOCK, "")
+        return Block(block_card) if self.block else NoBlock()
 
     def do_you_challenge_action(self, action: Action, taken_by: int, target: int) -> DoYouChallengeDecision:
-        return DoYouChallengeDecision.CHALLENGE if self.challenge else DoYouChallengeDecision.ALLOW
+        return Challenge() if self.challenge else Allow()
 
     def do_you_challenge_block(self, action: Action, taken_by: int, target: int, block_card: Card,
                                blocker: int) -> DoYouChallengeDecision:
-        return DoYouChallengeDecision.CHALLENGE if self.challenge_block else DoYouChallengeDecision.ALLOW
+        return Challenge() if self.challenge_block else Allow()
 
     def action_was_taken(self, action: Action, taken_by: int, target: int):
         pass

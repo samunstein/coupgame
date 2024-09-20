@@ -1,28 +1,23 @@
-from Tools.scripts.generate_token import make_c
-
-from common.common import make_command_params
-from config import PARAM_SPLITTER, COMMAND_END
 from connection.common import Connection
 from game.gameclient import PlayerClient
 from game.logic.clients import ClientLogic
+from game.messages.commands import Command
 
 
 class ServerMockConnection(Connection):
     def __init__(self, gameclient: PlayerClient):
         self.client = gameclient
 
-    def send(self, *msg):
-        return self.client.run_command(msg[0], msg[1:])
+    def send(self, command: Command):
+        return self.client.run_command(command)
 
     def receive(self):
         pass
 
-    def send_and_receive(self, *msg):
-        res = self.send(*msg)
-        if isinstance(res, tuple|list):
-            return make_command_params(*res)
-        else:
-            return make_command_params(res)
+    def send_and_receive(self, command: Command) -> str:
+        res = self.send(command)
+        if res is not None:
+            return res.serialize()
 
     def close(self):
         pass

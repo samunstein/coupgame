@@ -1,9 +1,11 @@
-import random
 from abc import abstractmethod
 
 from common.common import debug_print
-from game.enums.actions import Action, YouAreChallengedDecision, DoYouBlockDecision, DoYouChallengeDecision
+from game.enums.actions import Action, Assassinate, Income
 from game.enums.cards import Card
+from game.messages.responses import YouAreChallengedDecision, ActionDecision, TargetedActionDecision, \
+    NonTargetedActionDecision, DoYouBlockDecision, DoYouChallengeDecision, AssassinateDecision, IncomeDecision, \
+    RevealCard, Concede, Block, NoBlock, Challenge, Allow
 
 
 class ClientLogic:
@@ -41,6 +43,14 @@ class ClientLogic:
     def remove_card(self, c: Card):
         raise NotImplementedError()
 
+    @abstractmethod
+    def player_lost_a_card(self, player: int, card: Card):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def a_player_is_dead(self, num: int):
+        raise NotImplementedError()
+
     # Card decisions
     @abstractmethod
     def choose_card_to_kill(self) -> Card:
@@ -65,7 +75,7 @@ class ClientLogic:
         raise NotImplementedError()
 
     @abstractmethod
-    def do_you_block(self, action: Action, taken_by: int) -> (DoYouBlockDecision, Card):
+    def do_you_block(self, action: Action, taken_by: int) -> DoYouBlockDecision:
         raise NotImplementedError()
 
     @abstractmethod
@@ -93,13 +103,6 @@ class ClientLogic:
     def block_was_challenged(self, action: Action, taken_by: int, target: int, block_card: Card, blocker: int, challenger: int, successful: bool):
         raise NotImplementedError()
 
-    @abstractmethod
-    def player_lost_a_card(self, player: int, card: Card):
-        raise NotImplementedError()
-
-    @abstractmethod
-    def a_player_is_dead(self, num: int):
-        raise NotImplementedError()
 
 class ExtremelySimpleTestClient(ClientLogic):
     def __init__(self):
@@ -149,56 +152,56 @@ class ExtremelySimpleTestClient(ClientLogic):
         return self.cards[0]
 
     # Turn flow
-    def take_turn(self) -> (Action, int):
+    def take_turn(self) -> ActionDecision:
         if self.money >= 3:
             print("Taking action assassinate")
-            return Action.ASSASSINATE, list(self.opponents.keys())[0]
+            return AssassinateDecision(list(self.opponents.keys())[0])
         else:
             print("Taking action income")
-            return Action.INCOME, self.number
+            return IncomeDecision()
 
     def your_action_is_challenged(self, action: Action, target: int, challenger: int) -> YouAreChallengedDecision:
         if action.requires_card[0] in self.cards:
             print(f"Revealing card {action.requires_card[0]} to challenge")
-            return YouAreChallengedDecision.REVEAL_CARD
+            return RevealCard()
         else:
             print("Conceding to challenge")
-            return YouAreChallengedDecision.CONCEDE
+            return Concede()
 
     def your_block_is_challenged(self, action: Action, taken_by: int, blocker: Card,
                                  challenged_by: int) -> YouAreChallengedDecision:
         if blocker in self.cards:
             print("My block is challenged. I have the blocker though")
-            return YouAreChallengedDecision.REVEAL_CARD
+            return RevealCard()
         else:
             print("My block is challenged. I admit I don't have the blocker")
-            return YouAreChallengedDecision.CONCEDE
+            return Concede()
 
-    def do_you_block(self, action: Action, taken_by: int) -> (DoYouBlockDecision, Card):
+    def do_you_block(self, action: Action, taken_by: int) -> DoYouBlockDecision:
         can_block_with = set(action.blocked_by).intersection(set(self.cards))
         if len(can_block_with):
             print(f"I block the {action.name} from {taken_by}")
-            return DoYouBlockDecision.BLOCK, can_block_with.pop()
+            return Block(can_block_with.pop())
         else:
             print(f"I don't block the {action.name} from {taken_by}")
-            return DoYouBlockDecision.NO_BLOCK, ""
+            return NoBlock()
 
     def do_you_challenge_action(self, action: Action, taken_by: int, target: int) -> DoYouChallengeDecision:
         if target == self.number:
             print(f"I challenge the {action.name} from {taken_by} to {target}")
-            return DoYouChallengeDecision.CHALLENGE
+            return Challenge()
         else:
             print(f"I don't challenge the {action.name} from {taken_by} to {target}")
-            return DoYouChallengeDecision.ALLOW
+            return Allow()
 
     def do_you_challenge_block(self, action: Action, taken_by: int, target: int,
                                block_card: Card, blocker: int) -> DoYouChallengeDecision:
         if taken_by == self.number:
             print(f"I challenge the block of {action.name} from {taken_by} to {target} with {block_card} by {blocker}")
-            return DoYouChallengeDecision.CHALLENGE
+            return Challenge()
         else:
             print(f"I don't challenge the block of {action.name} from {taken_by} to {target} with {block_card} by {blocker}")
-            return DoYouChallengeDecision.ALLOW
+            return Allow()
 
     # Log
     def action_was_taken(self, action: Action, taken_by: int, target: int):

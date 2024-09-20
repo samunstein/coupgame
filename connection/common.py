@@ -1,23 +1,25 @@
 import socket
 from abc import abstractmethod
 
-from config import PARAM_SPLITTER, COMMAND_END
+from config import COMMAND_END
+from game.messages.common import CoupMessage
+
 
 class Connection:
     @abstractmethod
-    def send(self, *msg):
+    def send(self, msg: CoupMessage):
         raise NotImplementedError()
 
     @abstractmethod
-    def receive(self):
+    def receive(self) -> str:
         raise NotImplementedError()
 
     @abstractmethod
-    def send_and_receive(self, *msg):
+    def send_and_receive(self, msg: CoupMessage) -> str:
         raise NotImplementedError()
 
     @abstractmethod
-    def close(self, *msg):
+    def close(self):
         raise NotImplementedError()
 
 
@@ -31,14 +33,14 @@ class OpenSocket(Connection):
     def __init__(self, connection):
         self.connection = connection
 
-    def send(self, *msg):
-        self.connection.sendall((PARAM_SPLITTER.join([str(m) for m in msg]) + COMMAND_END).encode("UTF-8"))
+    def send(self, msg: CoupMessage):
+        self.connection.sendall(msg.serialize().encode("UTF-8"))
 
-    def receive(self):
+    def receive(self) -> str:
         return self.connection.recv(1024).decode("UTF-8")
 
-    def send_and_receive(self, *msg):
-        self.send(*msg)
+    def send_and_receive(self, msg: CoupMessage) -> str:
+        self.send(msg)
         return self.receive()
 
     def close(self):

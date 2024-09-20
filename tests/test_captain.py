@@ -1,23 +1,23 @@
 import unittest
 from unittest import TestCase
 
-from game.enums.actions import Action, DoYouBlockDecision
-from game.enums.cards import Card
-from game.gameclient import PlayerClient
+from game.enums.actions import Action, Steal
+from game.enums.cards import Card, Captain, Duke, Ambassador
 from game.gameserver import Game
-from game.logic.clients import ClientLogic
+from game.messages.responses import StealDecision, Block, DoYouBlockDecision
 from tests.mocks.mock_connection import get_server_mock_connection
 from tests.mocks.mock_logic import MockLogic
+
 
 class Methods:
     @staticmethod
     def always_captain(self: MockLogic):
-        return Action.STEAL, self.opponents[0]
+        return StealDecision(self.opponents[0])
 
 class DukeTest(TestCase, Methods):
     def test_basic_no_blocks(self):
         clients = [get_server_mock_connection(MockLogic(Methods.always_captain, False, False, False)) for _ in range(2)]
-        game = Game(clients, deck=[Card.CAPTAIN] * 4)
+        game = Game(clients, deck=[Captain()] * 4)
         game.setup_players()
 
         game.run_one_turn()
@@ -26,7 +26,7 @@ class DukeTest(TestCase, Methods):
 
     def test_one_money(self):
         clients = [get_server_mock_connection(MockLogic(Methods.always_captain, False, False, False)) for _ in range(2)]
-        game = Game(clients, deck=[Card.CAPTAIN] * 4)
+        game = Game(clients, deck=[Captain()] * 4)
         game.setup_players()
         game.players[1].give_money(-1)
 
@@ -36,7 +36,7 @@ class DukeTest(TestCase, Methods):
 
     def test_no_money(self):
         clients = [get_server_mock_connection(MockLogic(Methods.always_captain, False, False, False)) for _ in range(2)]
-        game = Game(clients, deck=[Card.CAPTAIN] * 4)
+        game = Game(clients, deck=[Captain()] * 4)
         game.setup_players()
         game.players[1].give_money(-2)
 
@@ -46,7 +46,7 @@ class DukeTest(TestCase, Methods):
 
     def test_challenge(self):
         clients = [get_server_mock_connection(MockLogic(Methods.always_captain, True, False, False)) for _ in range(2)]
-        game = Game(clients, deck=[Card.CAPTAIN] * 4)
+        game = Game(clients, deck=[Captain()] * 4)
         game.setup_players()
 
         game.run_one_turn()
@@ -56,7 +56,7 @@ class DukeTest(TestCase, Methods):
 
     def test_block(self):
         clients = [get_server_mock_connection(MockLogic(Methods.always_captain, False, True, False)) for _ in range(2)]
-        game = Game(clients, deck=[Card.CAPTAIN] * 4)
+        game = Game(clients, deck=[Captain()] * 4)
         game.setup_players()
 
         game.run_one_turn()
@@ -65,12 +65,12 @@ class DukeTest(TestCase, Methods):
 
     def test_unsuccessful_block(self):
         clients = [get_server_mock_connection(MockLogic(Methods.always_captain, False, True, True)) for _ in range(2)]
-        game = Game(clients, deck=[Card.CAPTAIN] * 4)
+        game = Game(clients, deck=[Captain()] * 4)
         game.setup_players()
-        game.players[1].remove_card(Card.CAPTAIN)
-        game.players[1].remove_card(Card.CAPTAIN)
-        game.players[1].give_card(Card.DUKE)
-        game.players[1].give_card(Card.DUKE)
+        game.players[1].remove_card(Captain())
+        game.players[1].remove_card(Captain())
+        game.players[1].give_card(Duke())
+        game.players[1].give_card(Duke())
 
         game.run_one_turn()
         self.assertEqual(game.players[0].money, 4)
@@ -79,24 +79,24 @@ class DukeTest(TestCase, Methods):
 
     def test_insta_dead(self):
         clients = [get_server_mock_connection(MockLogic(Methods.always_captain, True, True, True)) for _ in range(2)]
-        game = Game(clients, deck=[Card.CAPTAIN] * 4)
+        game = Game(clients, deck=[Captain()] * 4)
         game.setup_players()
-        game.players[1].remove_card(Card.CAPTAIN)
-        game.players[1].remove_card(Card.CAPTAIN)
-        game.players[1].give_card(Card.DUKE)
-        game.players[1].give_card(Card.DUKE)
+        game.players[1].remove_card(Captain())
+        game.players[1].remove_card(Captain())
+        game.players[1].give_card(Duke())
+        game.players[1].give_card(Duke())
 
         game.run_one_turn()
         self.assertEqual(len(game.alive_players), 1)
 
     def test_ambassador_block(self):
         clients = [get_server_mock_connection(MockLogic(Methods.always_captain, False, True, True)) for _ in range(2)]
-        game = Game(clients, deck=[Card.CAPTAIN] * 4)
+        game = Game(clients, deck=[Captain()] * 4)
         game.setup_players()
-        game.players[1].remove_card(Card.CAPTAIN)
-        game.players[1].remove_card(Card.CAPTAIN)
-        game.players[1].give_card(Card.AMBASSADOR)
-        game.players[1].give_card(Card.AMBASSADOR)
+        game.players[1].remove_card(Captain())
+        game.players[1].remove_card(Captain())
+        game.players[1].give_card(Ambassador())
+        game.players[1].give_card(Ambassador())
 
         game.run_one_turn()
         self.assertEqual(game.players[0].money, 2)
@@ -105,11 +105,11 @@ class DukeTest(TestCase, Methods):
 
     def test_wrong_correct_card_block(self):
         class AmbassadorBlockerLogic(MockLogic):
-            def do_you_block(self, action: Action, taken_by: int) -> (DoYouBlockDecision, Card):
-                return DoYouBlockDecision.BLOCK, Card.AMBASSADOR
+            def do_you_block(self, action: Action, taken_by: int) -> DoYouBlockDecision:
+                return Block(Ambassador())
 
         clients = [get_server_mock_connection(AmbassadorBlockerLogic(Methods.always_captain, False, True, True)) for _ in range(2)]
-        game = Game(clients, deck=[Card.CAPTAIN] * 4)
+        game = Game(clients, deck=[Captain()] * 4)
         game.setup_players()
 
         game.run_one_turn()
