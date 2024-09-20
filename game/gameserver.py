@@ -393,7 +393,7 @@ class Player:
 
         # Target chooses which card to kill
         def closure_block():
-            killed = target_player.connection.send_and_receive(CHOOSE_CARD_TO_KILL)
+            killed = get_just_data_from_socket(target_player.connection.send_and_receive(CHOOSE_CARD_TO_KILL))[0]
             if killed not in target_player.cards:
                 target_player.debug_message("You don't have that card")
                 return False, None

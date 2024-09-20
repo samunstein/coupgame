@@ -40,7 +40,7 @@ class MockLogic(ClientLogic):
         return self.cards[-1]
 
     def choose_ambassador_cards_to_remove(self) -> (Card, Card):
-        return self.cards[-1], self.cards[-2]
+        return self.cards[0], self.cards[1]
 
     def take_turn(self) -> (Action, int):
         return self.action(self)
@@ -59,7 +59,9 @@ class MockLogic(ClientLogic):
             return YouAreChallengedDecision.CONCEDE
 
     def do_you_block(self, action: Action, taken_by: int) -> (DoYouBlockDecision, Card):
-        return (DoYouBlockDecision.BLOCK, action.blocked_by[0]) if self.block else (DoYouBlockDecision.NO_BLOCK, "")
+        have_block_card = set(self.cards).intersection(set(action.blocked_by))
+        block_card = have_block_card.pop() if have_block_card else action.blocked_by[0]
+        return (DoYouBlockDecision.BLOCK, block_card) if self.block else (DoYouBlockDecision.NO_BLOCK, "")
 
     def do_you_challenge_action(self, action: Action, taken_by: int, target: int) -> DoYouChallengeDecision:
         return DoYouChallengeDecision.CHALLENGE if self.challenge else DoYouChallengeDecision.ALLOW
