@@ -25,6 +25,10 @@ class Methods:
     def always_coup(self: MockLogic):
         return CoupDecision(self.opponents[0])
 
+    @staticmethod
+    def coup_self(self: MockLogic):
+        return CoupDecision(self.number)
+
 class CoupTest(TestCase, Methods):
     def test_basic(self):
         clients = [get_server_mock_connection(MockLogic(Methods.coup_or_fa, False, False, False)) for _ in range(2)]
@@ -48,6 +52,15 @@ class CoupTest(TestCase, Methods):
 
     def test_die_if_not_forced_coup(self):
         clients = [get_server_mock_connection(MockLogic(Methods.always_fa, False, False, False)) for _ in range(2)]
+        game = Game(clients, deck=[Contessa()] * 4)
+        game.setup_players()
+        game.players[0].give_money(8)
+        game.run_one_turn()
+        self.assertEqual(game.players[0].cards, [])
+        self.assertEqual(len(game.alive_players), 1)
+
+    def test_die_if_self_target(self):
+        clients = [get_server_mock_connection(MockLogic(Methods.coup_self, False, False, False)) for _ in range(2)]
         game = Game(clients, deck=[Contessa()] * 4)
         game.setup_players()
         game.players[0].give_money(8)

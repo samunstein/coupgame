@@ -12,13 +12,14 @@ from game.messages.responses import Challenge, Allow, NameResponse, YouAreChalle
 
 
 class Player:
-    def __init__(self, number: int, connection: Connection):
+    def __init__(self, number: int, connection: Connection, crash_on_violation: bool):
         self.cards: list[Card] = []
         self.money: int = 0
         self.connection: Connection = connection
         self.name: str = ""
         self.number: int = number
         self.all_players: list['Player'] = []
+        self.crash_on_violation = crash_on_violation
 
     def __str__(self):
         return f"{self.name}"
@@ -156,6 +157,7 @@ class Player:
                 continue
 
             if challenge is True:
+                debug_print(f"It is challenged by {maybe_challenger.number}")
                 def closure_block():
                     what_do = YouAreChallengedDecision.deserialize(self.connection.send_and_receive(YourActionIsChallenged(action, target_number,
                                                          maybe_challenger.number)))
@@ -187,10 +189,12 @@ class Player:
                     deck.append(card)
                     random.shuffle(deck)
                     self.give_card(deck.pop())
+                    debug_print("Challenge unsuccessful")
 
                 else:
                     challenge_success = True
                     life_loser = self
+                    debug_print("Challenge successful")
 
                 def dead_chooser_closure():
                     killed = CardResponse.deserialize(life_loser.connection.send_and_receive(ChooseCardToKill()))
@@ -247,6 +251,7 @@ class Player:
                 continue
 
             if isinstance(block_decision, Block):
+                debug_print(f"It is blocked by {other_num}")
                 return self._handle_block_challenges(action, target_number, block_decision.card, other_num, other_players, deck)
 
         return True
@@ -280,6 +285,7 @@ class Player:
                 continue
 
             if isinstance(challenge, Challenge):
+                debug_print(f"The block is challenged by {other_num}")
                 blocker_player = other_players[blocker_number]
 
                 def closure_block():
@@ -311,10 +317,12 @@ class Player:
                     deck.append(block_card)
                     random.shuffle(deck)
                     blocker_player.give_card(deck.pop())
+                    debug_print("Block challenge unsuccessful")
 
                 else:
                     challenge_success = True
                     life_loser = blocker_player
+                    debug_print("Block challenge successful")
 
                 def dead_chooser_closure():
                     killed = CardResponse.deserialize(life_loser.connection.send_and_receive(ChooseCardToKill()))
@@ -393,7 +401,7 @@ class Player:
             if killed.card not in target_player.cards:
                 target_player.debug_message("You don't have that card")
                 return False, None
-            target_player.cards.remove(killed.card)
+            target_player.remove_card(killed.card)
             self._log_successful_action_result(Coup(), target_player.number)
             return True, None
 
@@ -424,7 +432,9 @@ class Player:
         self._extort_a_correct_command_with_threat_of_violence(closure_block, self)
 
     def emergency_kill(self, player: 'Player'):
-        debug_print(f"Player {player} died because of rule violations")
+        debug_print(f"Player {player.number} died because of rule violations")
+        if self.crash_on_violation:
+            raise Exception("Crashing on rule violation")
         for c in player.cards:
             for p in self.all_players:
                 p.connection.send(PlayerLostACard(player.number, c))
@@ -432,7 +442,7 @@ class Player:
         player.cards = []
 
     def take_turn(self, other_players: dict[int, 'Player'], deck: list[Card]):
-        debug_print(f"Player {self} taking turn")
+        debug_print(f"Player {self.number} taking turn")
 
         def closure_block():
             raw = self.connection.send_and_receive(TakeTurn())
@@ -447,7 +457,7 @@ class Player:
             else:
                 target_number = -1
 
-            debug_print(f"Player {self} attempting {action} on {target_number}")
+            debug_print(f"Player {self.number} attempting {action} on {target_number}")
 
             if not self._check_action_leglity(action, target_number, other_players):
                 return False, None
@@ -490,8 +500,8 @@ class Player:
 
 
 class Game:
-    def __init__(self, connections: list[Connection], deck: list[Card] | None = None):
-        self.players = {i: Player(i, c) for i, c in enumerate(connections)}
+    def __init__(self, connections: list[Connection], deck: list[Card] | None = None, crash_on_violation: bool = False):
+        self.players = {i: Player(i, c, crash_on_violation) for i, c in enumerate(connections)}
         for p in self.players.values():
             p.player_number(p.number)
             p.find_name()
@@ -534,7 +544,7 @@ class Game:
         self.alive_players = [p for p in self.alive_players[1:] + [self.alive_players[0]] if len(p.cards)]
 
         if len(self.alive_players) == 1:
-            debug_print(f"Winner is {self.alive_players[0]}!")
+            debug_print(f"Winner is {self.alive_players[0].number}!")
             for p in self.players.values():
                 p.shutdown()
             return True

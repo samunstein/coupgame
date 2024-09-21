@@ -5,7 +5,7 @@ from game.enums.actions import Action
 from game.enums.cards import Card
 from game.messages.responses import YouAreChallengedDecision, ActionDecision, DoYouBlockDecision, \
     DoYouChallengeDecision, AssassinateDecision, IncomeDecision, \
-    RevealCard, Concede, Block, NoBlock, Challenge, Allow
+    RevealCard, Concede, Block, NoBlock, Challenge, Allow, CardResponse, AmbassadorCardResponse
 
 
 class ClientLogic:
@@ -53,17 +53,16 @@ class ClientLogic:
 
     # Card decisions
     @abstractmethod
-    def choose_card_to_kill(self) -> Card:
+    def choose_card_to_kill(self) -> CardResponse:
         raise NotImplementedError()
 
     @abstractmethod
-    def choose_ambassador_cards_to_remove(self) -> (Card, Card):
+    def choose_ambassador_cards_to_remove(self) -> AmbassadorCardResponse:
         raise NotImplementedError()
-
 
     # Turn flow
     @abstractmethod
-    def take_turn(self) -> (Action, int):
+    def take_turn(self) -> ActionDecision:
         raise NotImplementedError()
 
     @abstractmethod
@@ -143,13 +142,13 @@ class ExtremelySimpleTestClient(ClientLogic):
         print(f"Removing {c}. Cards now {self.cards}")
 
     # Card decisions
-    def choose_ambassador_cards_to_remove(self) -> (Card, Card):
+    def choose_ambassador_cards_to_remove(self) -> AmbassadorCardResponse:
         print(f"Choosing {self.cards[0:2]} to shuffle by ambassador")
-        return self.cards[0], self.cards[1]
+        return AmbassadorCardResponse(self.cards[0], self.cards[1])
 
-    def choose_card_to_kill(self) -> Card:
+    def choose_card_to_kill(self) -> CardResponse:
         print(f"Choosing {self.cards[0]} to kill")
-        return self.cards[0]
+        return CardResponse(self.cards[0])
 
     # Turn flow
     def take_turn(self) -> ActionDecision:

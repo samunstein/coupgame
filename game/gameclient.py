@@ -44,9 +44,9 @@ class PlayerClient:
 
         # Card decisions
         elif isinstance(command, ChooseCardToKill):
-            return CardResponse(self.logic.choose_card_to_kill())
+            return self.logic.choose_card_to_kill()
         elif isinstance(command, ChooseAmbassadorCardsToRemove):
-            return AmbassadorCardResponse(*self.logic.choose_ambassador_cards_to_remove())
+            return self.logic.choose_ambassador_cards_to_remove()
 
         # Turn flow
         elif isinstance(command, TakeTurn):

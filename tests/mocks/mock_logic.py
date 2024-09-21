@@ -2,11 +2,11 @@ from game.enums.actions import Action
 from game.enums.cards import Card
 from game.logic.clients import ClientLogic
 from game.messages.responses import RevealCard, Concede, YouAreChallengedDecision, Block, NoBlock, DoYouBlockDecision, \
-    DoYouChallengeDecision, Challenge, Allow
+    DoYouChallengeDecision, Challenge, Allow, CardResponse, AmbassadorCardResponse, ActionDecision
 
 
 class MockLogic(ClientLogic):
-    def __init__(self, action: lambda self: (Action, int), challenge: bool, block: bool, challenge_block: bool):
+    def __init__(self, action: lambda self: ActionDecision, challenge: bool, block: bool, challenge_block: bool):
         self.opponents = []
         self.cards = []
         self.number = -1
@@ -39,13 +39,13 @@ class MockLogic(ClientLogic):
     def remove_card(self, c: Card):
         self.cards.remove(c)
 
-    def choose_card_to_kill(self) -> Card:
-        return self.cards[-1]
+    def choose_card_to_kill(self) -> CardResponse:
+        return CardResponse(self.cards[-1])
 
-    def choose_ambassador_cards_to_remove(self) -> (Card, Card):
-        return self.cards[0], self.cards[1]
+    def choose_ambassador_cards_to_remove(self) -> AmbassadorCardResponse:
+        return AmbassadorCardResponse(self.cards[0], self.cards[1])
 
-    def take_turn(self) -> (Action, int):
+    def take_turn(self) -> ActionDecision:
         return self.action(self)
 
     def your_action_is_challenged(self, action: Action, target: int, challenger: int) -> YouAreChallengedDecision:
@@ -90,7 +90,8 @@ class MockLogic(ClientLogic):
         pass
 
     def a_player_is_dead(self, num: int):
-        pass
+        if num != self.number:
+            self.opponents.remove(num)
 
     def debug_message(self, msg: str):
         print(f"Debug: {msg}")
