@@ -1,8 +1,8 @@
 import unittest
 from unittest import TestCase
 
-from game.enums.actions import Action, Steal
-from game.enums.cards import Card, Captain, Duke, Ambassador
+from game.enums.actions import Action
+from game.enums.cards import Captain, Duke, Ambassador
 from game.gameserver import Game
 from game.messages.responses import StealDecision, Block, DoYouBlockDecision
 from tests.mocks.mock_connection import get_server_mock_connection
@@ -13,6 +13,7 @@ class Methods:
     @staticmethod
     def always_captain(self: MockLogic):
         return StealDecision(self.opponents[0])
+
 
 class DukeTest(TestCase, Methods):
     def test_basic_no_blocks(self):
@@ -108,7 +109,8 @@ class DukeTest(TestCase, Methods):
             def do_you_block(self, action: Action, taken_by: int) -> DoYouBlockDecision:
                 return Block(Ambassador())
 
-        clients = [get_server_mock_connection(AmbassadorBlockerLogic(Methods.always_captain, False, True, True)) for _ in range(2)]
+        clients = [get_server_mock_connection(AmbassadorBlockerLogic(Methods.always_captain, False, True, True)) for _
+                   in range(2)]
         game = Game(clients, deck=[Captain()] * 4)
         game.setup_players()
 

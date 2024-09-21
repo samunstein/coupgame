@@ -70,7 +70,8 @@ class ClientLogic:
         raise NotImplementedError()
 
     @abstractmethod
-    def your_block_is_challenged(self, action: Action, taken_by: int, blocker: Card, challenged_by: int) -> YouAreChallengedDecision:
+    def your_block_is_challenged(self, action: Action, taken_by: int, blocker: Card,
+                                 challenged_by: int) -> YouAreChallengedDecision:
         raise NotImplementedError()
 
     @abstractmethod
@@ -82,7 +83,8 @@ class ClientLogic:
         raise NotImplementedError()
 
     @abstractmethod
-    def do_you_challenge_block(self, action: Action, taken_by: int, target: int, block_card: Card, blocker: int) -> DoYouChallengeDecision:
+    def do_you_challenge_block(self, action: Action, taken_by: int, target: int, block_card: Card,
+                               blocker: int) -> DoYouChallengeDecision:
         raise NotImplementedError()
 
     # Log
@@ -99,7 +101,8 @@ class ClientLogic:
         raise NotImplementedError()
 
     @abstractmethod
-    def block_was_challenged(self, action: Action, taken_by: int, target: int, block_card: Card, blocker: int, challenger: int, successful: bool):
+    def block_was_challenged(self, action: Action, taken_by: int, target: int, block_card: Card, blocker: int,
+                             challenger: int, successful: bool):
         raise NotImplementedError()
 
 
@@ -199,7 +202,8 @@ class ExtremelySimpleTestClient(ClientLogic):
             print(f"I challenge the block of {action.name} from {taken_by} to {target} with {block_card} by {blocker}")
             return Challenge()
         else:
-            print(f"I don't challenge the block of {action.name} from {taken_by} to {target} with {block_card} by {blocker}")
+            print(
+                f"I don't challenge the block of {action.name} from {taken_by} to {target} with {block_card} by {blocker}")
             return Allow()
 
     # Log
@@ -210,9 +214,11 @@ class ExtremelySimpleTestClient(ClientLogic):
         print(f"Log: Action {action.name} was blocked with {blocker} by {blocker}. Taken by {taken_by} to {target}.")
 
     def action_was_challenged(self, action: Action, taken_by: int, target: int, challenger: int, successful: bool):
-        print(f"Log: Action {action.name} was challenged by {challenger} with success {successful}. Taken by {taken_by} to {target}")
+        print(
+            f"Log: Action {action.name} was challenged by {challenger} with success {successful}. Taken by {taken_by} to {target}")
 
-    def block_was_challenged(self, action: Action, taken_by: int, target: int, block_card: Card, blocker: int, challenger: int,
+    def block_was_challenged(self, action: Action, taken_by: int, target: int, block_card: Card, blocker: int,
+                             challenger: int,
                              successful: bool):
         print(
             f"Log: Action {action.name} block with {block_card} by {blocker} was challenged by {challenger} with success {successful}. Taken by {taken_by} to {target}")

@@ -27,9 +27,11 @@ class Methods:
         game.players[1].give_card(Captain())
         game.players[1].give_card(Captain())
 
+
 class DukeTest(TestCase, Methods):
     def test_basic_no_blocks(self):
-        clients = [get_server_mock_connection(MockLogic(Methods.tax_if_duke_or_fa, False, False, False)) for _ in range(2)]
+        clients = [get_server_mock_connection(MockLogic(Methods.tax_if_duke_or_fa, False, False, False)) for _ in
+                   range(2)]
         game = Game(clients, deck=[Duke()] * 4)
         game.setup_players()
         Methods.one_player_with_dukes_other_not(game)
@@ -40,7 +42,8 @@ class DukeTest(TestCase, Methods):
         self.assertEqual(game.players[1].money, 4)
 
     def test_challenge(self):
-        clients = [get_server_mock_connection(MockLogic(Methods.tax_if_duke_or_fa, True, False, False)) for _ in range(2)]
+        clients = [get_server_mock_connection(MockLogic(Methods.tax_if_duke_or_fa, True, False, False)) for _ in
+                   range(2)]
         game = Game(clients, deck=[Duke()] * 4)
         game.setup_players()
         Methods.one_player_with_dukes_other_not(game)
@@ -50,7 +53,8 @@ class DukeTest(TestCase, Methods):
         self.assertEqual(len(game.players[1].cards), 1)
 
     def test_block(self):
-        clients = [get_server_mock_connection(MockLogic(Methods.tax_if_duke_or_fa, False, True, False)) for _ in range(2)]
+        clients = [get_server_mock_connection(MockLogic(Methods.tax_if_duke_or_fa, False, True, False)) for _ in
+                   range(2)]
         game = Game(clients, deck=[Captain()] * 4)
         game.setup_players()
 

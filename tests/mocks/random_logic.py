@@ -1,13 +1,14 @@
 import random
 
 from config import PARAM_SPLITTER, COMMAND_END
-from game.enums.actions import Action, Steal
-from game.enums.cards import Card, Assassin, Ambassador
+from game.enums.actions import Action
+from game.enums.cards import Card, Ambassador
 from game.logic.clients import ClientLogic
 from game.messages.common import CoupMessage
 from game.messages.responses import RevealCard, Concede, YouAreChallengedDecision, Block, NoBlock, DoYouBlockDecision, \
     DoYouChallengeDecision, Challenge, Allow, CardResponse, AmbassadorCardResponse, IncomeDecision, ActionDecision, \
-    ForeignAidDecision, TaxDecision, StealDecision, CoupDecision, AssassinateDecision, AmbassadateDecision, Response
+    ForeignAidDecision, TaxDecision, StealDecision, CoupDecision, AssassinateDecision, AmbassadateDecision
+
 
 class CustomWrongResponse(CoupMessage):
     def serialize(self) -> str:
@@ -72,7 +73,6 @@ class RandomLogic(ClientLogic):
                 CustomWrongResponse(CardResponse.message_name, [])
             ])
 
-
     def choose_ambassador_cards_to_remove(self) -> AmbassadorCardResponse:
         if self._correct():
             cards = [c for c in self.cards]
@@ -95,12 +95,13 @@ class RandomLogic(ClientLogic):
                 return CoupDecision(opponent)
             else:
                 return random.choice([
-                    IncomeDecision(),
-                    ForeignAidDecision(),
-                    TaxDecision(),
-                    StealDecision(opponent),
-                    AmbassadateDecision(),
-                ] + ([AssassinateDecision(opponent)] if self.money >= 3 else []) + ([CoupDecision(opponent)] if self.money >= 7 else []))
+                                         IncomeDecision(),
+                                         ForeignAidDecision(),
+                                         TaxDecision(),
+                                         StealDecision(opponent),
+                                         AmbassadateDecision(),
+                                     ] + ([AssassinateDecision(opponent)] if self.money >= 3 else []) + (
+                                         [CoupDecision(opponent)] if self.money >= 7 else []))
         else:
             return random.choice([
                 StealDecision(len(self.opponents)),
@@ -109,7 +110,6 @@ class RandomLogic(ClientLogic):
                 CoupDecision(self.number),
                 CustomWrongResponse(StealDecision.message_name, [])
             ])
-
 
     def your_action_is_challenged(self, action: Action, target: int, challenger: int) -> YouAreChallengedDecision:
         if self._correct():

@@ -4,8 +4,10 @@ from game.enums.actions import *
 from game.enums.cards import Card
 from game.messages.common import ParseSubclassNameParameters
 
+
 class Response(ParseSubclassNameParameters, metaclass=ABCMeta):
     pass
+
 
 class NameResponse(Response):
     message_name = "name_response"
@@ -25,6 +27,7 @@ class ActionDecision(Response, metaclass=ABCMeta):
     @abstractmethod
     def action(self) -> Action:
         raise NotImplementedError()
+
 
 class TargetedActionDecision(ActionDecision):
     def write_data_str_list(self) -> list[object]:
@@ -57,6 +60,7 @@ class NonTargetedActionDecision(ActionDecision, metaclass=ABCMeta):
     def parse_from_params(cls, params: list[str]) -> 'NonTargetedActionDecision':
         return cls()
 
+
 class IncomeDecision(NonTargetedActionDecision):
     message_name = "income_decision"
 
@@ -65,6 +69,7 @@ class IncomeDecision(NonTargetedActionDecision):
 
     def action(self) -> Action:
         return Income()
+
 
 class ForeignAidDecision(NonTargetedActionDecision):
     message_name = "foreign_aid_decision"
@@ -75,6 +80,7 @@ class ForeignAidDecision(NonTargetedActionDecision):
     def action(self) -> Action:
         return ForeignAid()
 
+
 class TaxDecision(NonTargetedActionDecision):
     message_name = "tax_decision"
 
@@ -84,6 +90,7 @@ class TaxDecision(NonTargetedActionDecision):
     def action(self) -> Action:
         return Tax()
 
+
 class AmbassadateDecision(NonTargetedActionDecision):
     message_name = "ambassadate_decision"
 
@@ -92,6 +99,7 @@ class AmbassadateDecision(NonTargetedActionDecision):
 
     def action(self) -> Action:
         return Ambassadate()
+
 
 class AssassinateDecision(TargetedActionDecision):
     message_name = "assassinate_decision"
@@ -131,6 +139,7 @@ class CoupDecision(TargetedActionDecision):
     def target(self) -> int:
         return self._target
 
+
 class YouAreChallengedDecision(Response, metaclass=ABCMeta):
     def write_data_str_list(self) -> list[object]:
         return []
@@ -145,13 +154,16 @@ class YouAreChallengedDecision(Response, metaclass=ABCMeta):
     def __repr__(self):
         return f"{self.message_name}"
 
+
 class RevealCard(YouAreChallengedDecision):
     # Because of turn flow structuring (block challenge) and coup rules (action challenge), there is always
     # only one card possible to reveal when this one is asked, so no card parameter is needed.
     message_name = "reveal_card"
 
+
 class Concede(YouAreChallengedDecision):
     message_name = "concede"
+
 
 class DoYouChallengeDecision(Response, metaclass=ABCMeta):
     def __repr__(self):
@@ -167,8 +179,10 @@ class DoYouChallengeDecision(Response, metaclass=ABCMeta):
     def __init__(self):
         pass
 
+
 class Challenge(DoYouChallengeDecision):
     message_name = "challenge"
+
 
 class Allow(DoYouChallengeDecision):
     message_name = "allow"
@@ -176,6 +190,7 @@ class Allow(DoYouChallengeDecision):
 
 class DoYouBlockDecision(Response, metaclass=ABCMeta):
     pass
+
 
 class Block(DoYouBlockDecision):
     message_name = "block"
@@ -193,6 +208,7 @@ class Block(DoYouBlockDecision):
     def __repr__(self):
         return f"{self.message_name}:{self.card}"
 
+
 class NoBlock(DoYouBlockDecision):
     message_name = "no_block"
 
@@ -206,6 +222,7 @@ class NoBlock(DoYouBlockDecision):
     def __init__(self):
         pass
 
+
 class CardResponse(Response):
     message_name = "card_message"
 
@@ -218,6 +235,7 @@ class CardResponse(Response):
 
     def __init__(self, card: Card):
         self.card = card
+
 
 class AmbassadorCardResponse(Response):
     message_name = "ambassador_card_message"

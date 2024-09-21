@@ -1,7 +1,6 @@
 import socket
 from abc import abstractmethod
 
-from config import COMMAND_END
 from game.messages.common import CoupMessage
 
 

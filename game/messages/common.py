@@ -12,6 +12,7 @@ class CoupMessage:
     def deserialize(cls, params: str) -> 'CoupMessage':
         raise NotImplementedError()
 
+
 class ParseSubclassNameParameters(CoupMessage, metaclass=ABCMeta):
     @classmethod
     def transitive_named_subclasses(cls):

@@ -1,8 +1,7 @@
 import unittest
 from unittest import TestCase
 
-from game.enums.actions import Action
-from game.enums.cards import Card, Contessa
+from game.enums.cards import Contessa
 from game.gameserver import Game
 from game.messages.responses import ForeignAidDecision, CoupDecision
 from tests.mocks.mock_connection import get_server_mock_connection
@@ -28,6 +27,7 @@ class Methods:
     @staticmethod
     def coup_self(self: MockLogic):
         return CoupDecision(self.number)
+
 
 class CoupTest(TestCase, Methods):
     def test_basic(self):
@@ -67,7 +67,6 @@ class CoupTest(TestCase, Methods):
         game.run_one_turn()
         self.assertEqual(game.players[0].cards, [])
         self.assertEqual(len(game.alive_players), 1)
-
 
 
 if __name__ == '__main__':

@@ -1,11 +1,8 @@
 import unittest
 from unittest import TestCase
 
-from game.enums.cards import Card, Contessa, Assassin
 from game.gameserver import Game
-from game.messages.responses import AssassinateDecision, IncomeDecision
 from tests.mocks.mock_connection import get_server_mock_connection
-from tests.mocks.mock_logic import MockLogic
 from tests.mocks.random_logic import RandomLogic
 
 
@@ -33,7 +30,7 @@ class RandomTest(TestCase):
     def test_that_single_violations_are_ok(self):
         # The clients do rule violations, but only one at a time
         for _ in range(500):
-            clients = [get_server_mock_connection(RandomLogic(0.2, only_one_wrong = True)) for _ in range(2)]
+            clients = [get_server_mock_connection(RandomLogic(0.2, only_one_wrong=True)) for _ in range(2)]
             game = Game(clients, crash_on_violation=True)
             game.setup_players()
 

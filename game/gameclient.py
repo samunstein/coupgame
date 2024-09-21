@@ -1,8 +1,8 @@
 from common.common import debug_print
 from config import PARAM_SPLITTER, CONTROL_CHAR_REPLACE, COMMAND_END
 from connection.common import Connection
-from game.messages.commands import *
 from game.logic.clients import ClientLogic
+from game.messages.commands import *
 from game.messages.responses import *
 
 
@@ -23,8 +23,8 @@ class PlayerClient:
             self.running = False
         elif isinstance(command, AskName):
             return NameResponse(self.logic.ask_name()
-                    .replace(PARAM_SPLITTER, CONTROL_CHAR_REPLACE)
-                    .replace(COMMAND_END, CONTROL_CHAR_REPLACE))
+                                .replace(PARAM_SPLITTER, CONTROL_CHAR_REPLACE)
+                                .replace(COMMAND_END, CONTROL_CHAR_REPLACE))
         elif isinstance(command, AddOpponent):
             self.logic.add_opponent(command.number, command.player_name)
         elif isinstance(command, SetPlayerNumber):
@@ -54,23 +54,28 @@ class PlayerClient:
         elif isinstance(command, YourActionIsChallenged):
             return self.logic.your_action_is_challenged(command.action, command.target, command.challenger)
         elif isinstance(command, YourBlockIsChallenged):
-            return self.logic.your_block_is_challenged(command.action, command.action_doer, command.block_card, command.challenger)
+            return self.logic.your_block_is_challenged(command.action, command.action_doer, command.block_card,
+                                                       command.challenger)
         elif isinstance(command, DoYouBlock):
             return self.logic.do_you_block(command.action, command.action_doer)
         elif isinstance(command, DoYouChallengeAction):
             return self.logic.do_you_challenge_action(command.action, command.action_doer, command.target)
         elif isinstance(command, DoYouChallengeBlock):
-            return self.logic.do_you_challenge_block(command.action, command.action_doer, command.target, command.block_card, command.blocked_by)
+            return self.logic.do_you_challenge_block(command.action, command.action_doer, command.target,
+                                                     command.block_card, command.blocked_by)
 
         # Log
         elif isinstance(command, ActionWasTaken):
             self.logic.action_was_taken(command.action, command.action_doer, command.target)
         elif isinstance(command, ActionWasBlocked):
-            self.logic.action_was_blocked(command.action, command.action_doer, command.target, command.block_card, command.blocked_by)
+            self.logic.action_was_blocked(command.action, command.action_doer, command.target, command.block_card,
+                                          command.blocked_by)
         elif isinstance(command, ActionWasChallenged):
-            self.logic.action_was_challenged(command.action, command.action_doer, command.target, command.challenger, command.success)
+            self.logic.action_was_challenged(command.action, command.action_doer, command.target, command.challenger,
+                                             command.success)
         elif isinstance(command, BlockWasChallenged):
-            self.logic.block_was_challenged(command.action, command.action_taker, command.target, command.block_card, command.blocked_by, command.challenger, command.success)
+            self.logic.block_was_challenged(command.action, command.action_taker, command.target, command.block_card,
+                                            command.blocked_by, command.challenger, command.success)
         else:
             print("Unknown command", command)
 

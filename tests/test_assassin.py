@@ -1,7 +1,7 @@
 import unittest
 from unittest import TestCase
 
-from game.enums.cards import Card, Contessa, Assassin
+from game.enums.cards import Contessa, Assassin
 from game.gameserver import Game
 from game.messages.responses import AssassinateDecision, IncomeDecision
 from tests.mocks.mock_connection import get_server_mock_connection
@@ -16,9 +16,11 @@ class Methods:
         else:
             return IncomeDecision()
 
+
 class AssassinTest(TestCase, Methods):
     def test_basic_no_blocks(self):
-        clients = [get_server_mock_connection(MockLogic(Methods.assassinate_if_money, False, False, False)) for _ in range(2)]
+        clients = [get_server_mock_connection(MockLogic(Methods.assassinate_if_money, False, False, False)) for _ in
+                   range(2)]
         game = Game(clients)
         game.setup_players()
 
@@ -44,7 +46,8 @@ class AssassinTest(TestCase, Methods):
         self.assertEqual(len(game.players[1].cards), 1)
 
     def test_challenge_no_block(self):
-        clients = [get_server_mock_connection(MockLogic(Methods.assassinate_if_money, True, False, False)) for _ in range(2)]
+        clients = [get_server_mock_connection(MockLogic(Methods.assassinate_if_money, True, False, False)) for _ in
+                   range(2)]
         game = Game(clients, deck=[Contessa()] * 4)
         game.setup_players()
         game.players[0].give_money(1)
@@ -69,7 +72,8 @@ class AssassinTest(TestCase, Methods):
         self.assertEqual(game.alive_players[0].cards, [Contessa(), Assassin()])
 
     def test_insta_die(self):
-        clients = [get_server_mock_connection(MockLogic(Methods.assassinate_if_money, True, False, False)) for _ in range(2)]
+        clients = [get_server_mock_connection(MockLogic(Methods.assassinate_if_money, True, False, False)) for _ in
+                   range(2)]
         game = Game(clients, deck=[Assassin()] * 5)
         game.setup_players()
         game.players[0].give_money(1)
@@ -80,7 +84,8 @@ class AssassinTest(TestCase, Methods):
         self.assertEqual(game.alive_players[0].money, 0)
 
     def test_blocking(self):
-        clients = [get_server_mock_connection(MockLogic(Methods.assassinate_if_money, False, True, False)) for _ in range(2)]
+        clients = [get_server_mock_connection(MockLogic(Methods.assassinate_if_money, False, True, False)) for _ in
+                   range(2)]
         game = Game(clients)
         game.setup_players()
         game.players[0].give_money(1)
@@ -93,7 +98,8 @@ class AssassinTest(TestCase, Methods):
 
     def test_block_challenge(self):
         # Nonsuccessful challenge
-        clients = [get_server_mock_connection(MockLogic(Methods.assassinate_if_money, False, True, True)) for _ in range(2)]
+        clients = [get_server_mock_connection(MockLogic(Methods.assassinate_if_money, False, True, True)) for _ in
+                   range(2)]
         game = Game(clients, deck=[Contessa()] * 4)
         game.setup_players()
         game.players[0].give_money(1)
@@ -104,7 +110,8 @@ class AssassinTest(TestCase, Methods):
         self.assertEqual(len(game.players[1].cards), 2)
 
         # Successful challenge
-        clients = [get_server_mock_connection(MockLogic(Methods.assassinate_if_money, False, True, True)) for _ in range(2)]
+        clients = [get_server_mock_connection(MockLogic(Methods.assassinate_if_money, False, True, True)) for _ in
+                   range(2)]
         game = Game(clients, deck=[Assassin()] * 4)
         game.setup_players()
         game.players[0].give_money(1)
@@ -114,6 +121,7 @@ class AssassinTest(TestCase, Methods):
         self.assertEqual(len(game.alive_players), 1)
         self.assertEqual(len(game.players[0].cards), 2)
         self.assertEqual(game.alive_players[0].number, 0)
+
 
 if __name__ == '__main__':
     unittest.main()

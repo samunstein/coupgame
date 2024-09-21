@@ -34,11 +34,13 @@ class Duke(Card):
     def __init__(self):
         pass
 
+
 class Contessa(Card):
     name = "contessa"
 
     def __init__(self):
         pass
+
 
 class Assassin(Card):
     name = "assassin"
@@ -46,11 +48,13 @@ class Assassin(Card):
     def __init__(self):
         pass
 
+
 class Captain(Card):
     name = "captain"
 
     def __init__(self):
         pass
+
 
 class Ambassador(Card):
     name = "ambassador"

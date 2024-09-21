@@ -55,6 +55,7 @@ class Steal(Action):
     def __init__(self):
         pass
 
+
 class Assassinate(Action):
     name = "assassinate"
     cost = 3
@@ -64,6 +65,7 @@ class Assassinate(Action):
 
     def __init__(self):
         pass
+
 
 class ForeignAid(Action):
     name = "foreign_aid"
@@ -75,6 +77,7 @@ class ForeignAid(Action):
     def __init__(self):
         pass
 
+
 class Income(Action):
     name = "income"
     cost = 0
@@ -85,6 +88,7 @@ class Income(Action):
     def __init__(self):
         pass
 
+
 class Tax(Action):
     name = "tax"
     cost = 0
@@ -94,6 +98,7 @@ class Tax(Action):
 
     def __init__(self):
         pass
+
 
 class Coup(Action):
     name = "coup"
@@ -115,4 +120,3 @@ class Ambassadate(Action):
 
     def __init__(self):
         pass
-

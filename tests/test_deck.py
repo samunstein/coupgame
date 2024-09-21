@@ -14,9 +14,11 @@ class Methods:
     def always_ambassador(self: MockLogic):
         return AmbassadateDecision()
 
+
 class DeckTest(TestCase, Methods):
     def test_basic_ambassador(self):
-        clients = [get_server_mock_connection(MockLogic(Methods.always_ambassador, False, False, False)) for _ in range(2)]
+        clients = [get_server_mock_connection(MockLogic(Methods.always_ambassador, False, False, False)) for _ in
+                   range(2)]
         game = Game(clients, deck=[Ambassador()] * 6)
         game.setup_players()
 
@@ -27,7 +29,8 @@ class DeckTest(TestCase, Methods):
         self.assertEqual(len(game.players[1].cards), 2)
 
     def test_deck_state(self):
-        clients = [get_server_mock_connection(MockLogic(Methods.always_ambassador, False, False, False)) for _ in range(2)]
+        clients = [get_server_mock_connection(MockLogic(Methods.always_ambassador, False, False, False)) for _ in
+                   range(2)]
         game = Game(clients)
         game.setup_players()
 
@@ -37,7 +40,8 @@ class DeckTest(TestCase, Methods):
             self.assertEqual(all_cards_in_play.count(c), EACH_CARD_IN_DECK)
 
     def test_controlled_deck_state(self):
-        clients = [get_server_mock_connection(MockLogic(Methods.always_ambassador, False, False, False)) for _ in range(2)]
+        clients = [get_server_mock_connection(MockLogic(Methods.always_ambassador, False, False, False)) for _ in
+                   range(2)]
         game = Game(clients, deck=[Ambassador()] * 6)
         game.setup_players()
         game.players[0].remove_card(Ambassador())
@@ -50,7 +54,8 @@ class DeckTest(TestCase, Methods):
         self.assertEqual(game.deck, [Assassin()] * 2)
 
     def test_failed_challenge_ambassador(self):
-        clients = [get_server_mock_connection(MockLogic(Methods.always_ambassador, True, False, False)) for _ in range(2)]
+        clients = [get_server_mock_connection(MockLogic(Methods.always_ambassador, True, False, False)) for _ in
+                   range(2)]
         game = Game(clients, deck=[Ambassador()] * 6)
         game.setup_players()
         game.players[1].remove_card(Ambassador())
@@ -70,9 +75,6 @@ class DeckTest(TestCase, Methods):
         self.assertEqual(all_cards_in_play.count(Contessa()), 2)
         self.assertEqual(all_cards_in_play.count(Ambassador()), 2)
         self.assertEqual(all_cards_in_play.count(Assassin()), 1)
-
-
-
 
 
 if __name__ == '__main__':

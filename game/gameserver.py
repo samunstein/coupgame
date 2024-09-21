@@ -1,14 +1,13 @@
 import random
 
 from common.common import debug_print
-from config import PARAM_SPLITTER, CONTROL_CHAR_REPLACE, EACH_CARD_IN_DECK, WRONG_MESSAGE_TOLERANCE
+from config import EACH_CARD_IN_DECK, WRONG_MESSAGE_TOLERANCE
 from connection.common import Connection
 from game.enums.actions import *
-from game.enums.cards import *
 from game.messages.commands import *
 from game.messages.responses import Challenge, Allow, NameResponse, YouAreChallengedDecision, Concede, RevealCard, \
     CardResponse, DoYouBlockDecision, Block, NoBlock, DoYouChallengeDecision, AmbassadorCardResponse, ActionDecision, \
-    TargetedActionDecision, NonTargetedActionDecision
+    TargetedActionDecision
 
 
 class Player:
@@ -24,12 +23,12 @@ class Player:
     def __str__(self):
         return f"{self.name}"
 
-    def _handle_dead_players_in_the_middle_of_actions(self, other_players):
-        for key in list(other_players.keys()):
+    def _handle_dead_players_in_the_middle_of_actions(self, other_players: dict[int, 'Player']):
+        for key in list(other_players):
             if not len(other_players[key].cards):
                 other_players.pop(key)
 
-    def _extort_a_correct_command_with_threat_of_violence(self, function_block, one_responsible):
+    def _extort_a_correct_command_with_threat_of_violence(self, function_block, one_responsible: 'Player'):
         retval = None
         try:
             for _ in range(WRONG_MESSAGE_TOLERANCE):
@@ -70,6 +69,7 @@ class Player:
                 return False, None
             else:
                 return True, resp.player_name
+
         name = self._extort_a_correct_command_with_threat_of_violence(closure_block, self)
         self.name = name
         debug_print(f"{self.name} created")
@@ -111,19 +111,22 @@ class Player:
         for p in self.all_players:
             p.connection.send(ActionWasChallenged(action, self.number, target_num, challenger_num, successful))
 
-    def _log_block_challenge_result(self, action: Action, target_num: int, blocked_with: Card, blocker_num: int, challenger_num: int, successful: bool):
+    def _log_block_challenge_result(self, action: Action, target_num: int, blocked_with: Card, blocker_num: int,
+                                    challenger_num: int, successful: bool):
         debug_print(
             f"Blocking with {blocked_with} by {blocker_num} the {action} taken by {self.number} on {target_num} challenged by {challenger_num} with success {successful}")
         for p in self.all_players:
-            p.connection.send(BlockWasChallenged(action, self.number, target_num, blocked_with, blocker_num, challenger_num,
-                              successful))
+            p.connection.send(
+                BlockWasChallenged(action, self.number, target_num, blocked_with, blocker_num, challenger_num,
+                                   successful))
 
-    def _handle_challenges(self, action: Action, target_number: int, other_players: dict[int, 'Player'], deck: list[Card]):
+    def _handle_challenges(self, action: Action, target_number: int, other_players: dict[int, 'Player'],
+                           deck: list[Card]):
         # Returns whether the action can continue (False if successfully challenged)
         if not len(action.requires_card):
             return True
 
-        other_numbers_order = list(other_players.keys())
+        other_numbers_order = list(other_players)
         if action.targeted:
             other_numbers_order.remove(target_number)
             other_numbers_order.insert(0, target_number)
@@ -133,7 +136,7 @@ class Player:
 
             def closure_block() -> (bool, any):
                 raw = maybe_challenger.connection.send_and_receive(DoYouChallengeAction(action, self.number,
-                                                                 target_number))
+                                                                                        target_number))
                 decision = DoYouChallengeDecision.deserialize(raw)
 
                 if isinstance(decision, Challenge):
@@ -143,7 +146,6 @@ class Player:
                 else:
                     maybe_challenger.debug_message("Challenge or allow the action please")
                     return False, None
-
 
             challenge = self._extort_a_correct_command_with_threat_of_violence(closure_block, maybe_challenger)
             # Since we're kind of in the middle of logic, handle player dying here
@@ -158,9 +160,11 @@ class Player:
 
             if challenge is True:
                 debug_print(f"It is challenged by {maybe_challenger.number}")
+
                 def closure_block():
-                    what_do = YouAreChallengedDecision.deserialize(self.connection.send_and_receive(YourActionIsChallenged(action, target_number,
-                                                         maybe_challenger.number)))
+                    what_do = YouAreChallengedDecision.deserialize(
+                        self.connection.send_and_receive(YourActionIsChallenged(action, target_number,
+                                                                                maybe_challenger.number)))
                     if isinstance(what_do, Concede):
                         return True, what_do
                     elif isinstance(what_do, RevealCard):
@@ -225,13 +229,14 @@ class Player:
         if action.targeted:
             to_ask_numbers = [target_number]
         else:
-            to_ask_numbers = list(other_players.keys())
+            to_ask_numbers = list(other_players)
 
         for other_num in to_ask_numbers:
             maybe_blocker = other_players[other_num]
 
             def closure_block() -> (bool, object):
-                decision = DoYouBlockDecision.deserialize(maybe_blocker.connection.send_and_receive(DoYouBlock(action, self.number)))
+                decision = DoYouBlockDecision.deserialize(
+                    maybe_blocker.connection.send_and_receive(DoYouBlock(action, self.number)))
 
                 if decision is None:
                     maybe_blocker.debug_message("Challenge or allow the action please")
@@ -252,11 +257,13 @@ class Player:
 
             if isinstance(block_decision, Block):
                 debug_print(f"It is blocked by {other_num}")
-                return self._handle_block_challenges(action, target_number, block_decision.card, other_num, other_players, deck)
+                return self._handle_block_challenges(action, target_number, block_decision.card, other_num,
+                                                     other_players, deck)
 
         return True
 
-    def _handle_block_challenges(self, action: Action, target_num: int, block_card: Card, blocker_number: int, other_players: dict[int, 'Player'], deck: list[Card]):
+    def _handle_block_challenges(self, action: Action, target_num: int, block_card: Card, blocker_number: int,
+                                 other_players: dict[int, 'Player'], deck: list[Card]):
         # Returns if the action can continue (basically True only if the block was found to be faulty)
         possible_challengers = [self.number] + [num for num in other_players if num != blocker_number]
 
@@ -264,14 +271,15 @@ class Player:
             maybe_challenger = other_players[other_num] if other_num != self.number else self
 
             def closure_block() -> (bool, any):
-                decision = DoYouChallengeDecision.deserialize(maybe_challenger.connection.send_and_receive(DoYouChallengeBlock(action, self.number,
-                                                                 target_num, block_card, blocker_number)))
+                decision = DoYouChallengeDecision.deserialize(
+                    maybe_challenger.connection.send_and_receive(DoYouChallengeBlock(action, self.number,
+                                                                                     target_num, block_card,
+                                                                                     blocker_number)))
                 if decision is None:
                     maybe_challenger.debug_message("Challenge or allow the block please")
                     return False, None
 
                 return True, decision
-
 
             challenge = self._extort_a_correct_command_with_threat_of_violence(closure_block, maybe_challenger)
 
@@ -289,8 +297,10 @@ class Player:
                 blocker_player = other_players[blocker_number]
 
                 def closure_block():
-                    what_do = YouAreChallengedDecision.deserialize(blocker_player.connection.send_and_receive(YourBlockIsChallenged(action, self.number,
-                                                                   block_card, maybe_challenger.number)))
+                    what_do = YouAreChallengedDecision.deserialize(
+                        blocker_player.connection.send_and_receive(YourBlockIsChallenged(action, self.number,
+                                                                                         block_card,
+                                                                                         maybe_challenger.number)))
                     if isinstance(what_do, Concede):
                         return True, what_do
                     elif isinstance(what_do, RevealCard):
@@ -303,6 +313,7 @@ class Player:
                         blocker_player.debug_message("Choose to concede or reveal please")
 
                         return False, None
+
                 what_did = self._extort_a_correct_command_with_threat_of_violence(closure_block, blocker_player)
 
                 # Blocker player could not decide what to do with the challenge. Action may continue as the block is invalid
@@ -334,7 +345,8 @@ class Player:
                     life_loser.remove_card(killed.card)
                     for p in self.all_players:
                         p.connection.send(PlayerLostACard(life_loser.number, killed.card))
-                    self._log_block_challenge_result(action, target_num, block_card, blocker_number, maybe_challenger.number, challenge_success)
+                    self._log_block_challenge_result(action, target_num, block_card, blocker_number,
+                                                     maybe_challenger.number, challenge_success)
                     return True, None
 
                 self._extort_a_correct_command_with_threat_of_violence(dead_chooser_closure, life_loser)
@@ -413,13 +425,15 @@ class Player:
         self.give_card(deck.pop())
 
         def closure_block():
-            decision = AmbassadorCardResponse.deserialize(self.connection.send_and_receive(ChooseAmbassadorCardsToRemove()))
+            decision = AmbassadorCardResponse.deserialize(
+                self.connection.send_and_receive(ChooseAmbassadorCardsToRemove()))
             if decision is None:
                 return False, None
             if decision.card1 == decision.card2 and self.cards.count(decision.card1) < 2:
                 self.debug_message("You don't have 2 of that card")
                 return False, None
-            if decision.card1 != decision.card2 and (decision.card1 not in self.cards or decision.card2 not in self.cards):
+            if decision.card1 != decision.card2 and (
+                    decision.card1 not in self.cards or decision.card2 not in self.cards):
                 self.debug_message("You don't have both those cards")
                 return False, None
             self.remove_card(decision.card1)
@@ -555,4 +569,3 @@ class Game:
         while True:
             if self.run_one_turn():
                 break
-

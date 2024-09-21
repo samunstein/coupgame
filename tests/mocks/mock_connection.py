@@ -22,6 +22,7 @@ class ServerMockConnection(Connection):
     def close(self):
         pass
 
+
 class DummyConnection(Connection):
     def __init__(self):
         pass
@@ -37,6 +38,7 @@ class DummyConnection(Connection):
 
     def close(self):
         pass
+
 
 def get_server_mock_connection(logic: ClientLogic) -> ServerMockConnection:
     return ServerMockConnection(PlayerClient(DummyConnection(), logic))
