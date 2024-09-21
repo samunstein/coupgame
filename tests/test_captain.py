@@ -119,6 +119,16 @@ class DukeTest(TestCase, Methods):
         self.assertEqual(game.players[1].money, 0)
         self.assertEqual(len(game.players[1].cards), 1)
 
+    def test_resolve_on_dead_target(self):
+        clients = [get_server_mock_connection(MockLogic(Methods.always_captain, True, False, False)) for _ in range(2)]
+        game = Game(clients, deck=[Captain()] * 4)
+        game.setup_players()
+        game.players[1].remove_card(Captain())
+
+        game.run_one_turn()
+        self.assertEqual(game.players[0].money, 4)
+        self.assertEqual(len(game.alive_players), 1)
+
 
 if __name__ == '__main__':
     unittest.main()

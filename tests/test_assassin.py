@@ -67,9 +67,10 @@ class AssassinTest(TestCase, Methods):
         # Second player was wrongfully challenged, and the first player lost a card and died. The deck is empty, but
         # the assassin in the second player's hand gets first returned and then given back.
         self.assertEqual(len(game.alive_players), 1)
-        self.assertEqual(game.alive_players[0].number, 1)
-        self.assertEqual(game.alive_players[0].money, 3)
-        self.assertEqual(game.alive_players[0].cards, [Contessa(), Assassin()])
+        n = list(game.alive_players)[0]
+        self.assertEqual(game.alive_players[n].number, 1)
+        self.assertEqual(game.alive_players[n].money, 0)
+        self.assertEqual(game.alive_players[n].cards, [Contessa(), Assassin()])
 
     def test_insta_die(self):
         clients = [get_server_mock_connection(MockLogic(Methods.assassinate_if_money, True, False, False)) for _ in
@@ -80,8 +81,9 @@ class AssassinTest(TestCase, Methods):
 
         game.run_one_turn()
         self.assertEqual(len(game.alive_players), 1)
-        self.assertEqual(game.alive_players[0].number, 0)
-        self.assertEqual(game.alive_players[0].money, 0)
+        n = list(game.alive_players)[0]
+        self.assertEqual(game.alive_players[n].number, 0)
+        self.assertEqual(game.alive_players[n].money, 0)
 
     def test_blocking(self):
         clients = [get_server_mock_connection(MockLogic(Methods.assassinate_if_money, False, True, False)) for _ in
@@ -97,7 +99,7 @@ class AssassinTest(TestCase, Methods):
         self.assertEqual(len(game.players[1].cards), 2)
 
     def test_block_challenge(self):
-        # Nonsuccessful challenge
+        # Unsuccessful challenge
         clients = [get_server_mock_connection(MockLogic(Methods.assassinate_if_money, False, True, True)) for _ in
                    range(2)]
         game = Game(clients, deck=[Contessa()] * 4)
@@ -119,8 +121,9 @@ class AssassinTest(TestCase, Methods):
         game.run_one_turn()
         self.assertEqual(game.players[0].money, 0)
         self.assertEqual(len(game.alive_players), 1)
-        self.assertEqual(len(game.players[0].cards), 2)
-        self.assertEqual(game.alive_players[0].number, 0)
+        n = list(game.alive_players)[0]
+        self.assertEqual(len(game.players[n].cards), 2)
+        self.assertEqual(game.alive_players[n].number, 0)
 
 
 if __name__ == '__main__':

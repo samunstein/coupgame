@@ -45,6 +45,9 @@ class TargetedActionDecision(ActionDecision):
     def __init__(self, target: int):
         raise NotImplementedError()
 
+    def __str__(self):
+        return repr(self)
+
     def __repr__(self):
         return f"{self.message_name}:{self.target()}"
 
@@ -55,6 +58,9 @@ class NonTargetedActionDecision(ActionDecision, metaclass=ABCMeta):
 
     def __repr__(self):
         return f"{self.message_name}"
+
+    def __str__(self):
+        return repr(self)
 
     @classmethod
     def parse_from_params(cls, params: list[str]) -> 'NonTargetedActionDecision':

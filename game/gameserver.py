@@ -1,532 +1,105 @@
 import random
+from collections.abc import Callable
 
 from common.common import debug_print
 from config import EACH_CARD_IN_DECK, WRONG_MESSAGE_TOLERANCE
 from connection.common import Connection
-from game.enums.actions import *
 from game.messages.commands import *
-from game.messages.responses import Challenge, Allow, NameResponse, YouAreChallengedDecision, Concede, RevealCard, \
-    CardResponse, DoYouBlockDecision, Block, NoBlock, DoYouChallengeDecision, AmbassadorCardResponse, ActionDecision, \
-    TargetedActionDecision
+from game.messages.responses import *
 
+
+class TurnEndPanic(Exception):
+    def __init__(self):
+        super().__init__()
 
 class Player:
-    def __init__(self, number: int, connection: Connection, crash_on_violation: bool):
+    def __init__(self, number: int, connection: Connection):
         self.cards: list[Card] = []
         self.money: int = 0
-        self.connection: Connection = connection
+        self._connection: Connection = connection
         self.name: str = ""
         self.number: int = number
-        self.all_players: list['Player'] = []
-        self.crash_on_violation = crash_on_violation
+
+    def __eq__(self, other: 'Player'):
+        return self.number == other.number
+
+    def send(self, msg: Command):
+        self._connection.send(msg)
+
+    def send_and_receive(self, msg: Command, response_type: type[Response]) -> Response:
+        res = self._connection.send_and_receive(msg)
+        return response_type.deserialize(res)
 
     def __str__(self):
-        return f"{self.name}"
-
-    def _handle_dead_players_in_the_middle_of_actions(self, other_players: dict[int, 'Player']):
-        for key in list(other_players):
-            if not len(other_players[key].cards):
-                other_players.pop(key)
-
-    def _extort_a_correct_command_with_threat_of_violence(self, function_block, one_responsible: 'Player'):
-        retval = None
-        try:
-            for _ in range(WRONG_MESSAGE_TOLERANCE):
-                success, result = function_block()
-                if success:
-                    retval = result
-                    break
-            else:
-                self.emergency_kill(one_responsible)
-        except TimeoutError:
-            debug_print(f"Player {one_responsible} took too long and timed out")
-            self.emergency_kill(one_responsible)
-        return retval
-
-    def set_all_players(self, all_p: list['Player']):
-        self.all_players = all_p
+        return f"{self.number}:{self.name}"
 
     def shutdown(self):
-        self.connection.send(Shutdown())
-        self.connection.close()
+        self.send(Shutdown())
+        self._connection.close()
 
     def give_card(self, c: Card):
         self.cards.append(c)
-        self.connection.send(AddCard(c))
+        self.send(AddCard(c))
 
     def remove_card(self, c: Card):
         self.cards.remove(c)
-        self.connection.send(RemoveCard(c))
+        self.send(RemoveCard(c))
 
     def give_money(self, m: int):
         self.money += m
-        self.connection.send(ChangeMoney(m))
-
-    def find_name(self):
-        def closure_block():
-            resp = NameResponse.deserialize(self.connection.send_and_receive(AskName()))
-            if resp is None:
-                return False, None
-            else:
-                return True, resp.player_name
-
-        name = self._extort_a_correct_command_with_threat_of_violence(closure_block, self)
-        self.name = name
-        debug_print(f"{self.name} created")
+        self.send(ChangeMoney(m))
 
     def debug_message(self, msg: str):
-        self.connection.send(DebugMessage(msg))
-
-    def add_opponent(self, num: int, name: str):
-        self.connection.send(AddOpponent(num, name))
-
-    def player_number(self, num: int):
-        self.connection.send(SetPlayerNumber(num))
-
-    def _check_action_leglity(self, action: Action, target_number: int, other_players: dict[int, 'Player']):
-        if action.targeted and target_number not in other_players:
-            self.debug_message("Target does not exist")
-            return False
-        if self.money < action.cost:
-            self.debug_message("Not enough money")
-            return False
-        if self.money >= 10 and action != Coup:
-            self.debug_message("Must coup")
-            return False
-        return True
-
-    def _log_successful_action_result(self, action: Action, target_num: int):
-        debug_print(f"{action} taken by {self.number} on {target_num} successful")
-        for p in self.all_players:
-            p.connection.send(ActionWasTaken(action, self.number, target_num))
-
-    def _log_block_result(self, action: Action, target_num: int, blocked_with: Card, blocked_by: int):
-        debug_print(f"{action} blocked with {blocked_with} by {blocked_by}. Taken by {self.number} on {target_num}")
-        for p in self.all_players:
-            p.connection.send(ActionWasBlocked(action, self.number, target_num, blocked_with, blocked_by))
-
-    def _log_challenge_result(self, action: Action, target_num: int, challenger_num: int, successful: bool):
-        debug_print(
-            f"{action} challenged by {challenger_num} with success {successful}. Taken by {self.number} on {target_num}")
-        for p in self.all_players:
-            p.connection.send(ActionWasChallenged(action, self.number, target_num, challenger_num, successful))
-
-    def _log_block_challenge_result(self, action: Action, target_num: int, blocked_with: Card, blocker_num: int,
-                                    challenger_num: int, successful: bool):
-        debug_print(
-            f"Blocking with {blocked_with} by {blocker_num} the {action} taken by {self.number} on {target_num} challenged by {challenger_num} with success {successful}")
-        for p in self.all_players:
-            p.connection.send(
-                BlockWasChallenged(action, self.number, target_num, blocked_with, blocker_num, challenger_num,
-                                   successful))
-
-    def _handle_challenges(self, action: Action, target_number: int, other_players: dict[int, 'Player'],
-                           deck: list[Card]):
-        # Returns whether the action can continue (False if successfully challenged)
-        if not len(action.requires_card):
-            return True
-
-        other_numbers_order = list(other_players)
-        if action.targeted:
-            other_numbers_order.remove(target_number)
-            other_numbers_order.insert(0, target_number)
-
-        for other_num in other_numbers_order:
-            maybe_challenger = other_players[other_num]
-
-            def closure_block() -> (bool, any):
-                raw = maybe_challenger.connection.send_and_receive(DoYouChallengeAction(action, self.number,
-                                                                                        target_number))
-                decision = DoYouChallengeDecision.deserialize(raw)
-
-                if isinstance(decision, Challenge):
-                    return True, True
-                elif isinstance(decision, Allow):
-                    return True, False
-                else:
-                    maybe_challenger.debug_message("Challenge or allow the action please")
-                    return False, None
-
-            challenge = self._extort_a_correct_command_with_threat_of_violence(closure_block, maybe_challenger)
-            # Since we're kind of in the middle of logic, handle player dying here
-            self._handle_dead_players_in_the_middle_of_actions(other_players)
-
-            # Target died of idiocy. Action cannot continue
-            if action.targeted and target_number not in other_players:
-                return False
-
-            if challenge is False:
-                continue
-
-            if challenge is True:
-                debug_print(f"It is challenged by {maybe_challenger.number}")
-
-                def closure_block():
-                    what_do = YouAreChallengedDecision.deserialize(
-                        self.connection.send_and_receive(YourActionIsChallenged(action, target_number,
-                                                                                maybe_challenger.number)))
-                    if isinstance(what_do, Concede):
-                        return True, what_do
-                    elif isinstance(what_do, RevealCard):
-                        required_card = action.requires_card[0]
-                        if required_card in self.cards:
-                            return True, what_do
-                        else:
-                            self.debug_message("You don't have the card to reveal. Concede.")
-                            return False, None
-                    else:
-                        self.debug_message("Choose to concede or reveal please")
-                        return False, None
-
-                what_did = self._extort_a_correct_command_with_threat_of_violence(closure_block, self)
-
-                # Action taker could not decide how to answer to the challenge
-                if what_did is None:
-                    return False
-
-                if isinstance(what_did, RevealCard):
-                    challenge_success = False
-                    life_loser = maybe_challenger
-
-                    card = action.requires_card[0]
-                    self.remove_card(card)
-                    deck.append(card)
-                    random.shuffle(deck)
-                    self.give_card(deck.pop())
-                    debug_print("Challenge unsuccessful")
-
-                else:
-                    challenge_success = True
-                    life_loser = self
-                    debug_print("Challenge successful")
-
-                def dead_chooser_closure():
-                    killed = CardResponse.deserialize(life_loser.connection.send_and_receive(ChooseCardToKill()))
-                    if killed is None:
-                        return False, None
-                    if killed.card not in life_loser.cards:
-                        life_loser.debug_message("You don't have that card")
-                        return False, None
-                    life_loser.remove_card(killed.card)
-                    for p in self.all_players:
-                        p.connection.send(PlayerLostACard(life_loser.number, killed.card))
-                    self._log_challenge_result(action, target_number, maybe_challenger.number, challenge_success)
-                    return True, None
-
-                self._extort_a_correct_command_with_threat_of_violence(dead_chooser_closure, life_loser)
-
-                # Challenge not successful => action may continue
-                return not challenge_success
-
-        # No challenges, return
-        return True
-
-    def _handle_blocks(self, action: Action, target_number: int, other_players: dict[int, 'Player'], deck: list[Card]):
-        # Returns whether the actions can continue (False if successfully blocked)
-        if not len(action.blocked_by):
-            return True
-
-        if action.targeted:
-            to_ask_numbers = [target_number]
-        else:
-            to_ask_numbers = list(other_players)
-
-        for other_num in to_ask_numbers:
-            maybe_blocker = other_players[other_num]
-
-            def closure_block() -> (bool, object):
-                decision = DoYouBlockDecision.deserialize(
-                    maybe_blocker.connection.send_and_receive(DoYouBlock(action, self.number)))
-
-                if decision is None:
-                    maybe_blocker.debug_message("Challenge or allow the action please")
-                    return False, None
-
-                return True, decision
-
-            block_decision = self._extort_a_correct_command_with_threat_of_violence(closure_block, maybe_blocker)
-
-            self._handle_dead_players_in_the_middle_of_actions(other_players)
-
-            # Target died of idiocy. Action cannot continue
-            if action.targeted and target_number not in other_players:
-                return False
-
-            if isinstance(block_decision, NoBlock):
-                continue
-
-            if isinstance(block_decision, Block):
-                debug_print(f"It is blocked by {other_num}")
-                return self._handle_block_challenges(action, target_number, block_decision.card, other_num,
-                                                     other_players, deck)
-
-        return True
-
-    def _handle_block_challenges(self, action: Action, target_num: int, block_card: Card, blocker_number: int,
-                                 other_players: dict[int, 'Player'], deck: list[Card]):
-        # Returns if the action can continue (basically True only if the block was found to be faulty)
-        possible_challengers = [self.number] + [num for num in other_players if num != blocker_number]
-
-        for other_num in possible_challengers:
-            maybe_challenger = other_players[other_num] if other_num != self.number else self
-
-            def closure_block() -> (bool, any):
-                decision = DoYouChallengeDecision.deserialize(
-                    maybe_challenger.connection.send_and_receive(DoYouChallengeBlock(action, self.number,
-                                                                                     target_num, block_card,
-                                                                                     blocker_number)))
-                if decision is None:
-                    maybe_challenger.debug_message("Challenge or allow the block please")
-                    return False, None
-
-                return True, decision
-
-            challenge = self._extort_a_correct_command_with_threat_of_violence(closure_block, maybe_challenger)
-
-            self._handle_dead_players_in_the_middle_of_actions(other_players)
-
-            if (action.targeted and target_num not in other_players) or not len(self.cards):
-                # Action may not continue if one of the participants died of idiocy
-                return False
-
-            if isinstance(challenge, Allow):
-                continue
-
-            if isinstance(challenge, Challenge):
-                debug_print(f"The block is challenged by {other_num}")
-                blocker_player = other_players[blocker_number]
-
-                def closure_block():
-                    what_do = YouAreChallengedDecision.deserialize(
-                        blocker_player.connection.send_and_receive(YourBlockIsChallenged(action, self.number,
-                                                                                         block_card,
-                                                                                         maybe_challenger.number)))
-                    if isinstance(what_do, Concede):
-                        return True, what_do
-                    elif isinstance(what_do, RevealCard):
-                        if block_card in blocker_player.cards:
-                            return True, what_do
-                        else:
-                            blocker_player.debug_message("You don't have that block card to reveal. Concede.")
-                            return False, None
-                    else:
-                        blocker_player.debug_message("Choose to concede or reveal please")
-
-                        return False, None
-
-                what_did = self._extort_a_correct_command_with_threat_of_violence(closure_block, blocker_player)
-
-                # Blocker player could not decide what to do with the challenge. Action may continue as the block is invalid
-                if what_did is None:
-                    return True
-
-                if isinstance(what_did, RevealCard):
-                    challenge_success = False
-                    life_loser = maybe_challenger
-
-                    blocker_player.remove_card(block_card)
-                    deck.append(block_card)
-                    random.shuffle(deck)
-                    blocker_player.give_card(deck.pop())
-                    debug_print("Block challenge unsuccessful")
-
-                else:
-                    challenge_success = True
-                    life_loser = blocker_player
-                    debug_print("Block challenge successful")
-
-                def dead_chooser_closure():
-                    killed = CardResponse.deserialize(life_loser.connection.send_and_receive(ChooseCardToKill()))
-                    if killed is None:
-                        return False, None
-                    if killed.card not in life_loser.cards:
-                        life_loser.debug_message("You don't have that card to kill")
-                        return False, None
-                    life_loser.remove_card(killed.card)
-                    for p in self.all_players:
-                        p.connection.send(PlayerLostACard(life_loser.number, killed.card))
-                    self._log_block_challenge_result(action, target_num, block_card, blocker_number,
-                                                     maybe_challenger.number, challenge_success)
-                    return True, None
-
-                self._extort_a_correct_command_with_threat_of_violence(dead_chooser_closure, life_loser)
-
-                # An action participant died of idiocy.
-                if not len(self.cards) or (action.targeted and target_num not in other_players):
-                    return False
-
-                # Challenge successful => no block => action may continue
-                return challenge_success
-
-        # No challenges, action may not continue because it is blocked
-        return False
-
-    def _handle_steal(self, target_num: int, other_players: dict[int, 'Player']):
-        target_player = other_players[target_num]
-        money_stolen = min(target_player.money, 2)
-        self.give_money(money_stolen)
-        target_player.give_money(-money_stolen)
-        self._log_successful_action_result(Steal(), target_player.number)
-
-    def a_player_is_dead(self, target_player: int):
-        self.connection.send(PlayerIsDead(target_player))
-
-    def _handle_assassinate(self, target_num: int, other_players: dict[int, 'Player']):
-        target_player = other_players[target_num]
-
-        # Target chooses which card to kill
-        def closure_block():
-            killed = CardResponse.deserialize(target_player.connection.send_and_receive(ChooseCardToKill()))
-            if killed is None:
-                return False, None
-            if killed.card not in target_player.cards:
-                target_player.debug_message("You don't have that card")
-                return False, None
-            target_player.remove_card(killed.card)
-            for p in self.all_players:
-                p.connection.send(PlayerLostACard(target_num, killed.card))
-            self._log_successful_action_result(Assassinate(), target_player.number)
-            return True, None
-
-        self._extort_a_correct_command_with_threat_of_violence(closure_block, target_player)
-
-    def _handle_foreign_aid(self):
-        self.give_money(2)
-        self._log_successful_action_result(ForeignAid(), self.number)
-
-    def _handle_income(self):
-        self.give_money(1)
-        self._log_successful_action_result(Income(), self.number)
-
-    def _handle_tax(self):
-        self.give_money(3)
-        self._log_successful_action_result(Tax(), self.number)
-
-    def _handle_coup(self, target_num: int, other_players: dict[int, 'Player']):
-        target_player = other_players[target_num]
-
-        # Target chooses which card to kill
-        def closure_block():
-            killed = CardResponse.deserialize(target_player.connection.send_and_receive(ChooseCardToKill()))
-            if killed is None:
-                return False, None
-            if killed.card not in target_player.cards:
-                target_player.debug_message("You don't have that card")
-                return False, None
-            target_player.remove_card(killed.card)
-            self._log_successful_action_result(Coup(), target_player.number)
-            return True, None
-
-        self._extort_a_correct_command_with_threat_of_violence(closure_block, target_player)
-
-    def _handle_ambassadate(self, deck: list[Card]):
-        random.shuffle(deck)
-        self.give_card(deck.pop())
-        self.give_card(deck.pop())
-
-        def closure_block():
-            decision = AmbassadorCardResponse.deserialize(
-                self.connection.send_and_receive(ChooseAmbassadorCardsToRemove()))
-            if decision is None:
-                return False, None
-            if decision.card1 == decision.card2 and self.cards.count(decision.card1) < 2:
-                self.debug_message("You don't have 2 of that card")
-                return False, None
-            if decision.card1 != decision.card2 and (
-                    decision.card1 not in self.cards or decision.card2 not in self.cards):
-                self.debug_message("You don't have both those cards")
-                return False, None
-            self.remove_card(decision.card1)
-            self.remove_card(decision.card2)
-            deck.append(decision.card1)
-            deck.append(decision.card2)
-            self._log_successful_action_result(Ambassadate(), self.number)
-            return True, None
-
-        self._extort_a_correct_command_with_threat_of_violence(closure_block, self)
-
-    def emergency_kill(self, player: 'Player'):
-        debug_print(f"Player {player.number} died because of rule violations")
-        if self.crash_on_violation:
-            raise Exception("Crashing on rule violation")
-        for c in player.cards:
-            for p in self.all_players:
-                p.connection.send(PlayerLostACard(player.number, c))
-
-        player.cards = []
-
-    def take_turn(self, other_players: dict[int, 'Player'], deck: list[Card]):
-        debug_print(f"Player {self.number} taking turn")
-
-        def closure_block():
-            raw = self.connection.send_and_receive(TakeTurn())
-            decision = ActionDecision.deserialize(raw)
-
-            if decision is None:
-                return False, None
-
-            action = decision.action()
-            if isinstance(decision, TargetedActionDecision):
-                target_number = decision.target()
-            else:
-                target_number = -1
-
-            debug_print(f"Player {self.number} attempting {action} on {target_number}")
-
-            if not self._check_action_leglity(action, target_number, other_players):
-                return False, None
-
-            if not self._handle_challenges(action, target_number, other_players, deck):
-                return True, None
-
-            self._handle_dead_players_in_the_middle_of_actions(other_players)
-            if action.targeted and target_number not in other_players:
-                return True, None
-
-            # Cost happens before possible blocking, but after challenges
-            if action.cost > 0:
-                self.give_money(-action.cost)
-
-            if not self._handle_blocks(action, target_number, other_players, deck):
-                return True, None
-
-            self._handle_dead_players_in_the_middle_of_actions(other_players)
-            if action.targeted and target_number not in other_players:
-                return True, None
-
-            if action == Steal():
-                self._handle_steal(target_number, other_players)
-            elif action == Assassinate():
-                self._handle_assassinate(target_number, other_players)
-            elif action == ForeignAid():
-                self._handle_foreign_aid()
-            elif action == Income():
-                self._handle_income()
-            elif action == Tax():
-                self._handle_tax()
-            elif action == Coup():
-                self._handle_coup(target_number, other_players)
-            elif action == Ambassadate():
-                self._handle_ambassadate(deck)
-            return True, None
-
-        self._extort_a_correct_command_with_threat_of_violence(closure_block, self)
+        self._connection.send(DebugMessage(msg))
 
 
 class Game:
     def __init__(self, connections: list[Connection], deck: list[Card] | None = None, crash_on_violation: bool = False):
-        self.players = {i: Player(i, c, crash_on_violation) for i, c in enumerate(connections)}
+        self.players: dict[int, Player] = {i: Player(i, c) for i, c in enumerate(connections)}
+        self.alive_players: dict[int, Player] = {p: self.players[p] for p in self.players}
         for p in self.players.values():
-            p.player_number(p.number)
-            p.find_name()
+            p.send(SetPlayerNumber(p.number))
+            name = self._extort_a_response(p, AskName(), NameResponse)
+            if name is not None:
+                p.name = name.player_name
         debug_print(f"Players {[p.name for p in self.players.values()]} joined.")
-        self.alive_players = list(self.players.values())
+        self.alive_players: dict[int, Player] = {p: self.players[p] for p in self.players}
         self.deck = []
         if deck is None:
             for c in Card.all():
                 self.deck.extend(EACH_CARD_IN_DECK * [c])
         else:
             self.deck = deck
+        self.crash_on_violation = crash_on_violation
+
+    def _mark_player_dead(self, player: Player):
+        for p in self.players.values():
+            p.send(PlayerIsDead(player.number))
+        self.alive_players.pop(player.number)
+
+    def _emergency_kill(self, player: 'Player'):
+        debug_print(f"Player {player.number} died because of rule violations")
+        if self.crash_on_violation:
+            raise Exception("Crashing on rule violation")
+        for c in player.cards.copy():
+            player.remove_card(c)
+            for p in self.players.values():
+                p.send(PlayerLostACard(player.number, c))
+        self._mark_player_dead(player)
+
+
+    def _extort_a_response[R](self, player: Player, command: Command, response_type: type[R], extra_condition: Callable[[R], bool] | None = None) -> R | None:
+        try:
+            for _ in range(WRONG_MESSAGE_TOLERANCE):
+                result = player.send_and_receive(command, response_type)
+                if result is None:
+                    continue
+                if extra_condition is not None and not extra_condition(result):
+                    continue
+                return result
+        except TimeoutError:
+            debug_print(f"Player {player.number} took too long and timed out")
+        self._emergency_kill(player)
 
     def _setup_player(self, player):
         random.shuffle(self.deck)
@@ -535,30 +108,338 @@ class Game:
         player.give_money(2)
         for other in self.players.values():
             if player.number != other.number:
-                player.add_opponent(other.number, other.name)
+                player.send(AddOpponent(other.number, other.name))
 
     def setup_players(self):
         for p in self.players.values():
             self._setup_player(p)
 
+    def _get_other_players_than(self, num: int) -> dict[int, Player]:
+        return {n: p for (n, p) in self.alive_players.items() if p.number != num}
+
+    def _choose_and_kill_a_card(self, player: Player, failure_means_panic: bool):
+        def check_has_card(r: CardResponse):
+            if r.card not in player.cards:
+                player.debug_message("You don't have that card")
+                return False
+            return True
+
+        card_response = self._extort_a_response(player, ChooseCardToKill(), CardResponse, check_has_card)
+
+        if card_response is None:
+            if failure_means_panic:
+                raise TurnEndPanic()
+        else:
+            player.remove_card(card_response.card)
+
+            for p in self.players.values():
+                p.send(PlayerLostACard(player.number, card_response.card))
+
+            if not player.cards:
+                self._mark_player_dead(player)
+
+
+    def _handle_challenges(self, player: Player, action: ActionDecision):
+        if not action.action().requires_card:
+            # Cannot be challenged
+            return
+
+        # There is always only one (if any) card that allows each action
+        required_card = action.action().requires_card[0]
+
+        other_players = self._get_other_players_than(player.number)
+        other_numbers = list(other_players)
+        # Random order of challenging, to lessen the effect of player order
+        random.shuffle(other_numbers)
+        target_num = -1
+        if isinstance(action, TargetedActionDecision):
+            target_num = action.target()
+            # Put target first
+            other_numbers = [action.target()] + [n for n in other_numbers if n != action.target()]
+
+        for other_num in other_numbers:
+            challenger = other_players[other_num]
+
+            challenge = self._extort_a_response(challenger, DoYouChallengeAction(action.action(), player.number, target_num), DoYouChallengeDecision)
+
+            # If target somehow died while answering, return but don't panic
+            if action.action().targeted and target_num not in self.alive_players:
+                return
+
+            if isinstance(challenge, Challenge):
+                debug_print(f"It is challenged by {challenger.number}")
+
+                def check_challenged_decision(decision: YouAreChallengedDecision):
+                    if isinstance(decision, RevealCard) and required_card not in player.cards:
+                        player.debug_message("You don't have the card to reveal. Concede.")
+                        return False
+                    return True
+
+                challenge_response = self._extort_a_response(player, YourActionIsChallenged(action.action(), target_num, challenger.number), YouAreChallengedDecision,
+                                                  check_challenged_decision)
+
+                # Action taker could not decide how to answer to the challenge
+                if challenge_response is None:
+                    raise TurnEndPanic()
+
+                if isinstance(challenge_response, RevealCard):
+                    challenge_success = False
+                    life_loser = challenger
+                    player.remove_card(required_card)
+                    self.deck.append(required_card)
+                    random.shuffle(self.deck)
+                    player.give_card(self.deck.pop())
+                    debug_print("Challenge unsuccessful")
+
+                else:
+                    challenge_success = True
+                    life_loser = player
+                    debug_print("Challenge successful")
+
+                self._choose_and_kill_a_card(life_loser, life_loser == player or life_loser.number == target_num)
+
+                self._log_challenge_result(player, action.action(), target_num, challenger.number, challenge_success)
+
+                if challenge_success:
+                    # Action cannot continue if it was successfully challenged
+                    raise TurnEndPanic()
+                return
+
+    def _log_challenge_result(self, player: Player, action: Action, target_num: int, challenger_num: int, successful: bool):
+        debug_print(
+            f"{action} challenged by {challenger_num} with success {successful}. Taken by {player.number} on {target_num}")
         for p in self.players.values():
-            p.set_all_players(list(self.players.values()))
+            p.send(ActionWasChallenged(action, player.number, target_num, challenger_num, successful))
+
+    def _handle_blocks(self, player: Player, action: ActionDecision):
+        if not action.action().blocked_by:
+            # Cannot be blocked
+            return
+
+        other_players = self._get_other_players_than(player.number)
+        other_numbers = list(other_players)
+        # Random order of challenging, to lessen the effect of player order
+        random.shuffle(other_numbers)
+        target_num = -1
+        if isinstance(action, TargetedActionDecision):
+            # If targeted, only ask block from the targeted player
+            target_num = action.target()
+            other_numbers = [action.target()]
+
+        for other_num in other_numbers:
+            blocker_player = other_players[other_num]
+            block_decision = self._extort_a_response(blocker_player, DoYouBlock(action.action(), player.number), DoYouBlockDecision)
+
+            if isinstance(block_decision, Block):
+                debug_print(f"It is blocked by {other_num}")
+                self._handle_block_challenges(player, action.action(), target_num, block_decision.card, blocker_player.number)
+                return
+
+    def _handle_block_challenges(self, player: Player, action: Action, target_num: int, block_card: Card, blocker_number: int):
+        possible_challengers = self._get_other_players_than(blocker_number)
+
+        for other_num in possible_challengers:
+            challenger = self.alive_players[other_num]
+
+            challenge_decision = self._extort_a_response(challenger, DoYouChallengeBlock(action, player.number, target_num, block_card, blocker_number), DoYouChallengeDecision)
+
+            # Only the action doer may affect the action here, as either there is no target, or the target is not
+            # a possible challenger anyway
+            if player.number not in self.alive_players:
+                raise TurnEndPanic()
+
+            if isinstance(challenge_decision, Challenge):
+                debug_print(f"The block is challenged by {other_num}")
+                blocker_player = self.alive_players[blocker_number]
+
+                def check_challenged_decision(decision: YouAreChallengedDecision):
+                    if isinstance(decision, RevealCard) and block_card not in blocker_player.cards:
+                        blocker_player.debug_message("You don't have the card to reveal. Concede.")
+                        return False
+                    return True
+
+                challenge_response = self._extort_a_response(blocker_player, YourBlockIsChallenged(action, player.number, block_card, challenger.number), YouAreChallengedDecision,
+                                                  check_challenged_decision)
+
+                # Blocker player could not decide what to do with the challenge. Action may continue as the block is invalid
+                if challenge_response is None:
+                    return
+
+                if isinstance(challenge_response, RevealCard):
+                    challenge_success = False
+                    life_loser = challenger
+                    blocker_player.remove_card(block_card)
+                    self.deck.append(block_card)
+                    random.shuffle(self.deck)
+                    blocker_player.give_card(self.deck.pop())
+                    debug_print("Block challenge unsuccessful")
+
+                else:
+                    challenge_success = True
+                    life_loser = blocker_player
+                    debug_print("Block challenge successful")
+
+                self._choose_and_kill_a_card(life_loser, life_loser == player)
+
+                self._log_block_challenge_result(player, action, target_num, block_card, blocker_number, challenger.number, challenge_success)
+
+                if challenge_success:
+                    # Action may continue
+                    return
+                else:
+                    # Block was challenged, but unsuccessfully -> action may not continue
+                    self._log_block_result(player, action, target_num, block_card, blocker_number)
+                    raise TurnEndPanic()
+
+        # Block was not challenged by anyone -> action is blocked and may not continue
+        self._log_block_result(player, action, target_num, block_card, blocker_number)
+        raise TurnEndPanic()
+
+    def _log_block_result(self, player: Player, action: Action, target_num: int, blocked_with: Card, blocked_by: int):
+        debug_print(f"{action} blocked with {blocked_with} by {blocked_by}. Taken by {player.number} on {target_num}")
+        for p in self.players.values():
+            p.send(ActionWasBlocked(action, player.number, target_num, blocked_with, blocked_by))
+
+    def _log_block_challenge_result(self, player: Player, action: Action, target_num: int, blocked_with: Card, blocker_num: int,
+                                    challenger_num: int, successful: bool):
+        debug_print(
+            f"Blocking with {blocked_with} by {blocker_num} the {action} taken by {player.number} on {target_num} challenged by {challenger_num} with success {successful}")
+        for p in self.players.values():
+            p.send(
+                BlockWasChallenged(action, player.number, target_num, blocked_with, blocker_num, challenger_num,
+                                   successful))
+
+    def _handle_steal(self, player: Player, target_num: int):
+        target_player = self.players[target_num]
+        money_stolen = min(target_player.money, 2)
+        player.give_money(money_stolen)
+        target_player.give_money(-money_stolen)
+        self._log_successful_action_result(player, Steal(), target_player.number)
+
+    def _handle_assassinate(self, player: Player, target_num: int):
+        target_player = self.alive_players[target_num]
+        self._choose_and_kill_a_card(target_player, False)
+        self._log_successful_action_result(player, Assassinate(), target_player.number)
+
+    def _handle_foreign_aid(self, player: Player):
+        player.give_money(2)
+        self._log_successful_action_result(player, ForeignAid(), -1)
+
+    def _handle_income(self, player: Player):
+        player.give_money(1)
+        self._log_successful_action_result(player, Income(), -1)
+
+    def _handle_tax(self, player: Player):
+        player.give_money(3)
+        self._log_successful_action_result(player, Tax(), -1)
+
+    def _handle_coup(self, player: Player, target_num: int):
+        target_player = self.alive_players[target_num]
+        self._choose_and_kill_a_card(target_player, False)
+        self._log_successful_action_result(player, Coup(), target_player.number)
+
+    def _handle_ambassadate(self, player: Player):
+        random.shuffle(self.deck)
+        player.give_card(self.deck.pop())
+        player.give_card(self.deck.pop())
+
+        def check_response(r: AmbassadorCardResponse):
+            if r.card1 == r.card2 and player.cards.count(r.card1) < 2:
+                player.debug_message("You don't have 2 of that card")
+                return False
+            if r.card1 != r.card2 and (
+                    r.card1 not in player.cards or r.card2 not in player.cards):
+                player.debug_message("You don't have both those cards")
+                return False
+            return True
+
+        decision = self._extort_a_response(player, ChooseAmbassadorCardsToRemove(), AmbassadorCardResponse, check_response)
+
+        if decision is None:
+            raise TurnEndPanic()
+
+        player.remove_card(decision.card1)
+        player.remove_card(decision.card2)
+        self.deck.append(decision.card1)
+        self.deck.append(decision.card2)
+        self._log_successful_action_result(player, Ambassadate(), -1)
+
+    def _log_successful_action_result(self, player: Player, action: Action, target_num: int):
+        debug_print(f"{action} taken by {player.number} on {target_num} successful")
+        for p in self.players.values():
+            p.send(ActionWasTaken(action, player.number, target_num))
+
+    def _take_action(self, player: Player):
+        debug_print(f"Player {player.number} taking turn")
+        other_players = self._get_other_players_than(player.number)
+
+        def check_action_legality(action_decision: ActionDecision):
+            if isinstance(action_decision, TargetedActionDecision) and action_decision.target() not in other_players:
+
+                player.debug_message(f"Target {action_decision.target()} does not exist in {other_players.keys()}")
+                return False
+            if player.money < action_decision.action().cost:
+                player.debug_message("Not enough money")
+                return False
+            if player.money >= 10 and action_decision.action() != Coup():
+                player.debug_message("Must coup")
+                return False
+            return True
+
+        action = self._extort_a_response(player, TakeTurn(), ActionDecision, check_action_legality)
+        if action is None:
+            raise TurnEndPanic()
+
+        debug_print(f"Player {player.number} attempting {action}")
+
+        self._handle_challenges(player, action)
+
+        # At this point the cost should be paid
+        player.give_money(-action.action().cost)
+
+        # Target might be dead here. Try block only if possible target is alive
+        if isinstance(action, TargetedActionDecision) and action.target() in self.alive_players or isinstance(action, NonTargetedActionDecision):
+            self._handle_blocks(player, action)
+
+        # Target might be dead here too. Steal may be performed on a dead target, but otherwise panic out
+        if isinstance(action, TargetedActionDecision) and action.target() not in self.alive_players and not isinstance(action, StealDecision):
+            raise TurnEndPanic()
+
+        if isinstance(action, StealDecision):
+            self._handle_steal(player, action.target())
+        elif isinstance(action, AssassinateDecision):
+            self._handle_assassinate(player, action.target())
+        elif isinstance(action, ForeignAidDecision):
+            self._handle_foreign_aid(player)
+        elif isinstance(action, IncomeDecision):
+            self._handle_income(player)
+        elif isinstance(action, TaxDecision):
+            self._handle_tax(player)
+        elif isinstance(action, CoupDecision):
+            self._handle_coup(player, action.target())
+        elif isinstance(action, AmbassadateDecision):
+            self._handle_ambassadate(player)
 
     # Returns whether the game has ended
     def run_one_turn(self) -> bool:
-        taking_action = self.alive_players[0]
-        taking_action.take_turn({p.number: p for p in self.alive_players[1:]}, self.deck)
+        # Remove the first player in the dict and insert it back, in effect
+        # rotating the dict and turn order
+        taking_action_num = list(self.alive_players)[0]
+        taking_action = self.alive_players.pop(taking_action_num)
+        self.alive_players[taking_action_num] = taking_action
 
-        # Eliminate players, and rotate turn
-        newly_dead = [p for p in self.alive_players if not len(p.cards)]
+        try:
+            self._take_action(taking_action)
+        except TurnEndPanic:
+            pass
+
+        newly_dead = [p for p in self.alive_players.values() if not len(p.cards)]
         for d in newly_dead:
             debug_print(f"Player {d.number} is dead")
-            for p in self.players.values():
-                p.a_player_is_dead(d.number)
-        self.alive_players = [p for p in self.alive_players[1:] + [self.alive_players[0]] if len(p.cards)]
+            self._mark_player_dead(d)
 
         if len(self.alive_players) == 1:
-            debug_print(f"Winner is {self.alive_players[0].number}!")
+            debug_print(f"Winner is {list(self.alive_players)[0]}!")
             for p in self.players.values():
                 p.shutdown()
             return True
