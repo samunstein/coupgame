@@ -28,12 +28,15 @@ class ParseSubclassNameParameters(CoupMessage, metaclass=ABCMeta):
         raise NotImplementedError()
 
     @classmethod
-    def deserialize(cls, serialized: str) -> 'ParseSubclassNameParameters':
+    def deserialize(cls, serialized: str) -> 'ParseSubclassNameParameters | None':
         split = serialized.strip(COMMAND_END).split(PARAM_SPLITTER)
         name = split[0]
         for sub in cls.transitive_named_subclasses():
             if sub.message_name == name:
-                return sub.parse_from_params(split[1:])
+                try:
+                    return sub.parse_from_params(split[1:])
+                except (IndexError, ValueError):
+                    return None
 
     @classmethod
     @abstractmethod

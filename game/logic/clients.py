@@ -1,10 +1,10 @@
 from abc import abstractmethod
 
 from common.common import debug_print
-from game.enums.actions import Action, Assassinate, Income
+from game.enums.actions import Action
 from game.enums.cards import Card
-from game.messages.responses import YouAreChallengedDecision, ActionDecision, TargetedActionDecision, \
-    NonTargetedActionDecision, DoYouBlockDecision, DoYouChallengeDecision, AssassinateDecision, IncomeDecision, \
+from game.messages.responses import YouAreChallengedDecision, ActionDecision, DoYouBlockDecision, \
+    DoYouChallengeDecision, AssassinateDecision, IncomeDecision, \
     RevealCard, Concede, Block, NoBlock, Challenge, Allow
 
 

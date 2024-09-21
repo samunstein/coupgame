@@ -194,6 +194,8 @@ class Player:
 
                 def dead_chooser_closure():
                     killed = CardResponse.deserialize(life_loser.connection.send_and_receive(ChooseCardToKill()))
+                    if killed is None:
+                        return False, None
                     if killed.card not in life_loser.cards:
                         life_loser.debug_message("You don't have that card")
                         return False, None
@@ -316,6 +318,8 @@ class Player:
 
                 def dead_chooser_closure():
                     killed = CardResponse.deserialize(life_loser.connection.send_and_receive(ChooseCardToKill()))
+                    if killed is None:
+                        return False, None
                     if killed.card not in life_loser.cards:
                         life_loser.debug_message("You don't have that card to kill")
                         return False, None
@@ -353,6 +357,8 @@ class Player:
         # Target chooses which card to kill
         def closure_block():
             killed = CardResponse.deserialize(target_player.connection.send_and_receive(ChooseCardToKill()))
+            if killed is None:
+                return False, None
             if killed.card not in target_player.cards:
                 target_player.debug_message("You don't have that card")
                 return False, None
@@ -382,6 +388,8 @@ class Player:
         # Target chooses which card to kill
         def closure_block():
             killed = CardResponse.deserialize(target_player.connection.send_and_receive(ChooseCardToKill()))
+            if killed is None:
+                return False, None
             if killed.card not in target_player.cards:
                 target_player.debug_message("You don't have that card")
                 return False, None
@@ -398,6 +406,8 @@ class Player:
 
         def closure_block():
             decision = AmbassadorCardResponse.deserialize(self.connection.send_and_receive(ChooseAmbassadorCardsToRemove()))
+            if decision is None:
+                return False, None
             if decision.card1 == decision.card2 and self.cards.count(decision.card1) < 2:
                 self.debug_message("You don't have 2 of that card")
                 return False, None
