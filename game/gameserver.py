@@ -100,8 +100,9 @@ class Game:
         except TimeoutError:
             debug_print(f"Player {player.number} took too long and timed out")
         self._emergency_kill(player)
+        return None
 
-    def _setup_player(self, player):
+    def _setup_player(self, player: Player):
         random.shuffle(self.deck)
         player.give_card(self.deck.pop())
         player.give_card(self.deck.pop())
