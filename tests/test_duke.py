@@ -11,7 +11,7 @@ from tests.mocks.mock_logic import MockLogic
 class Methods:
     @staticmethod
     def tax_if_duke_or_fa(self: MockLogic):
-        if Duke() in self.cards:
+        if Duke() in self.get_state().cards:
             return TaxDecision()
         else:
             return ForeignAidDecision()
@@ -22,10 +22,10 @@ class Methods:
 
     @staticmethod
     def one_player_with_dukes_other_not(game):
-        game.players[1].remove_card(Duke())
-        game.players[1].remove_card(Duke())
-        game.players[1].give_card(Captain())
-        game.players[1].give_card(Captain())
+        game.rule_abiding_players[1].remove_card(Duke())
+        game.rule_abiding_players[1].remove_card(Duke())
+        game.rule_abiding_players[1].give_card(Captain())
+        game.rule_abiding_players[1].give_card(Captain())
 
 
 class DukeTest(TestCase, Methods):
@@ -37,9 +37,9 @@ class DukeTest(TestCase, Methods):
         Methods.one_player_with_dukes_other_not(game)
 
         game.run_one_turn()
-        self.assertEqual(game.players[0].money, 5)
+        self.assertEqual(game.rule_abiding_players[0].money, 5)
         game.run_one_turn()
-        self.assertEqual(game.players[1].money, 4)
+        self.assertEqual(game.rule_abiding_players[1].money, 4)
 
     def test_challenge(self):
         clients = [get_server_mock_connection(MockLogic(Methods.tax_if_duke_or_fa, True, False, False)) for _ in
@@ -49,8 +49,8 @@ class DukeTest(TestCase, Methods):
         Methods.one_player_with_dukes_other_not(game)
 
         game.run_one_turn()
-        self.assertEqual(game.players[0].money, 5)
-        self.assertEqual(len(game.players[1].cards), 1)
+        self.assertEqual(game.rule_abiding_players[0].money, 5)
+        self.assertEqual(len(game.rule_abiding_players[1].cards), 1)
 
     def test_block(self):
         clients = [get_server_mock_connection(MockLogic(Methods.tax_if_duke_or_fa, False, True, False)) for _ in
@@ -59,7 +59,7 @@ class DukeTest(TestCase, Methods):
         game.setup_players()
 
         game.run_one_turn()
-        self.assertEqual(game.players[0].money, 2)
+        self.assertEqual(game.rule_abiding_players[0].money, 2)
 
     def test_block_challenge(self):
         clients = [get_server_mock_connection(MockLogic(Methods.always_fa, True, True, True)) for _ in range(2)]
@@ -68,8 +68,8 @@ class DukeTest(TestCase, Methods):
         Methods.one_player_with_dukes_other_not(game)
 
         game.run_one_turn()
-        self.assertEqual(game.players[0].money, 4)
-        self.assertEqual(len(game.players[1].cards), 1)
+        self.assertEqual(game.rule_abiding_players[0].money, 4)
+        self.assertEqual(len(game.rule_abiding_players[1].cards), 1)
 
         game.run_one_turn()
         self.assertEqual(len(game.alive_players), 1)

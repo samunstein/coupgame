@@ -7,15 +7,13 @@ from game.messages.responses import RevealCard, Concede, YouAreChallengedDecisio
 
 class MockLogic(ClientLogic):
     def __init__(self, action: lambda self: ActionDecision, challenge: bool, block: bool, challenge_block: bool):
-        self.opponents = []
-        self.cards = []
-        self.number = -1
-
         self.action = action
         self.challenge = challenge
         self.block = block
         self.challenge_block = challenge_block
-        self.money = 0
+
+    def new_game(self):
+        pass
 
     def shutdown(self):
         pass
@@ -24,45 +22,45 @@ class MockLogic(ClientLogic):
         return "mock"
 
     def add_opponent(self, number: int, name: str):
-        self.opponents.append(number)
+        pass
 
     def set_player_number(self, num: int):
-        self.number = num
+        pass
 
     def add_card(self, c: Card):
         print("Adding", c)
-        self.cards.append(c)
+        pass
 
     def change_money(self, m: int):
-        self.money += m
+        pass
 
     def remove_card(self, c: Card):
-        self.cards.remove(c)
+        pass
 
     def choose_card_to_kill(self) -> CardResponse:
-        return CardResponse(self.cards[-1])
+        return CardResponse(self.get_state().cards[-1])
 
     def choose_ambassador_cards_to_remove(self) -> AmbassadorCardResponse:
-        return AmbassadorCardResponse(self.cards[0], self.cards[1])
+        return AmbassadorCardResponse(self.get_state().cards[0], self.get_state().cards[1])
 
     def take_turn(self) -> ActionDecision:
         return self.action(self)
 
     def your_action_is_challenged(self, action: Action, target: int, challenger: int) -> YouAreChallengedDecision:
-        if action.requires_card[0] in self.cards:
+        if action.requires_card[0] in self.get_state().cards:
             return RevealCard()
         else:
             return Concede()
 
     def your_block_is_challenged(self, action: Action, taken_by: int, blocker: Card,
                                  challenged_by: int) -> YouAreChallengedDecision:
-        if blocker in self.cards:
+        if blocker in self.get_state().cards:
             return RevealCard()
         else:
             return Concede()
 
     def do_you_block(self, action: Action, taken_by: int) -> DoYouBlockDecision:
-        have_block_card = set(self.cards).intersection(set(action.blocked_by))
+        have_block_card = set(self.get_state().cards).intersection(set(action.blocked_by))
         block_card = have_block_card.pop() if have_block_card else action.blocked_by[0]
         return Block(block_card) if self.block else NoBlock()
 
@@ -89,9 +87,11 @@ class MockLogic(ClientLogic):
     def player_lost_a_card(self, player: int, card: Card):
         pass
 
-    def a_player_is_dead(self, num: int):
-        if num != self.number:
-            self.opponents.remove(num)
+    def money_changed(self, player: int, amount: int):
+        pass
+
+    def a_player_violated_rules(self, num: int):
+        pass
 
     def debug_message(self, msg: str):
         print(f"Debug: {msg}")

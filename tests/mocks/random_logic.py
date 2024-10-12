@@ -3,7 +3,7 @@ import random
 from config import PARAM_SPLITTER, COMMAND_END
 from game.enums.actions import Action
 from game.enums.cards import Card, Ambassador
-from game.logic.clients import ClientLogic
+from game.logic.clients import ClientLogic, OpponentState
 from game.messages.common import CoupMessage
 from game.messages.responses import RevealCard, Concede, YouAreChallengedDecision, Block, NoBlock, DoYouBlockDecision, \
     DoYouChallengeDecision, Challenge, Allow, CardResponse, AmbassadorCardResponse, IncomeDecision, ActionDecision, \
@@ -21,10 +21,6 @@ class CustomWrongResponse(CoupMessage):
 
 class RandomLogic(ClientLogic):
     def __init__(self, wrong_chance: float = 0.25, only_one_wrong: bool = False):
-        self.opponents: list[int] = []
-        self.cards = []
-        self.number = -1
-        self.money = 0
         self.wrong_chance = wrong_chance
         self.only_one_wrong = only_one_wrong
         self.last_was_wrong = False
@@ -38,6 +34,9 @@ class RandomLogic(ClientLogic):
             self.last_was_wrong = True
         return correct
 
+    def new_game(self):
+        pass
+
     def shutdown(self):
         pass
 
@@ -45,24 +44,24 @@ class RandomLogic(ClientLogic):
         return "random"
 
     def add_opponent(self, number: int, name: str):
-        self.opponents.append(number)
+        pass
 
     def set_player_number(self, num: int):
-        self.number = num
+        pass
 
     def add_card(self, c: Card):
-        print(self.number, "Adding", c)
-        self.cards.append(c)
+        print(self.get_state().number, "Adding", c)
+        pass
 
     def change_money(self, m: int):
-        self.money += m
+        pass
 
     def remove_card(self, c: Card):
-        print(self.number, "Removing", c)
-        self.cards.remove(c)
+        print(self.get_state().number, "Removing", c)
+        pass
 
     def choose_card_to_kill(self) -> CardResponse:
-        card = random.choice(self.cards)
+        card = random.choice(self.get_state().cards)
         if self._correct():
             return CardResponse(card)
         else:
@@ -75,7 +74,7 @@ class RandomLogic(ClientLogic):
 
     def choose_ambassador_cards_to_remove(self) -> AmbassadorCardResponse:
         if self._correct():
-            cards = [c for c in self.cards]
+            cards = [c for c in self.get_state().cards]
             random.shuffle(cards)
             card1 = cards.pop()
             card2 = cards.pop()
@@ -90,30 +89,30 @@ class RandomLogic(ClientLogic):
 
     def take_turn(self) -> ActionDecision:
         if self._correct():
-            opponent = random.choice(self.opponents)
-            if self.money >= 10:
-                return CoupDecision(opponent)
+            opponent: OpponentState = random.choice(list(self.get_state().alive_opponents().values()))
+            if self.get_state().money >= 10:
+                return CoupDecision(opponent.number)
             else:
                 return random.choice([
                                          IncomeDecision(),
                                          ForeignAidDecision(),
                                          TaxDecision(),
-                                         StealDecision(opponent),
+                                         StealDecision(opponent.number),
                                          AmbassadateDecision(),
-                                     ] + ([AssassinateDecision(opponent)] if self.money >= 3 else []) + (
-                                         [CoupDecision(opponent)] if self.money >= 7 else []))
+                                     ] + ([AssassinateDecision(opponent.number)] if self.get_state().money >= 3 else []) + (
+                                         [CoupDecision(opponent.number)] if self.get_state().money >= 7 else []))
         else:
             return random.choice([
-                StealDecision(len(self.opponents)),
+                StealDecision(len(self.get_state().opponents)),
                 StealDecision("no"),
                 CardResponse(Ambassador()),
-                CoupDecision(self.number),
+                CoupDecision(self.get_state().number),
                 CustomWrongResponse(StealDecision.message_name, [])
             ])
 
     def your_action_is_challenged(self, action: Action, target: int, challenger: int) -> YouAreChallengedDecision:
         if self._correct():
-            if action.requires_card[0] in self.cards:
+            if action.requires_card[0] in self.get_state().cards:
                 return RevealCard()
             else:
                 return Concede()
@@ -125,7 +124,7 @@ class RandomLogic(ClientLogic):
     def your_block_is_challenged(self, action: Action, taken_by: int, blocker: Card,
                                  challenged_by: int) -> YouAreChallengedDecision:
         if self._correct():
-            if blocker in self.cards:
+            if blocker in self.get_state().cards:
                 return RevealCard()
             else:
                 return Concede()
@@ -146,7 +145,7 @@ class RandomLogic(ClientLogic):
                     return NoBlock()
             else:
                 # 50% chance someone challenges
-                if random.random() > 0.5 ** (1 / len(self.opponents)):
+                if random.random() > 0.5 ** (1 / len(self.get_state().opponents)):
                     return Block(random.choice(action.blocked_by))
                 else:
                     return NoBlock()
@@ -159,7 +158,7 @@ class RandomLogic(ClientLogic):
     def do_you_challenge_action(self, action: Action, taken_by: int, target: int) -> DoYouChallengeDecision:
         if self._correct():
             # 50% chance someone challenges
-            if random.random() > 0.5 ** (1 / len(self.opponents)):
+            if random.random() > 0.5 ** (1 / len(self.get_state().opponents)):
                 return Challenge()
             else:
                 return Allow()
@@ -170,7 +169,7 @@ class RandomLogic(ClientLogic):
                                blocker: int) -> DoYouChallengeDecision:
         if self._correct():
             # 50% chance someone challenges
-            if random.random() > 0.5 ** (1 / len(self.opponents)):
+            if random.random() > 0.5 ** (1 / len(self.get_state().opponents)):
                 return Challenge()
             else:
                 return Allow()
@@ -193,9 +192,11 @@ class RandomLogic(ClientLogic):
     def player_lost_a_card(self, player: int, card: Card):
         pass
 
-    def a_player_is_dead(self, num: int):
-        if num != self.number:
-            self.opponents.remove(num)
+    def a_player_violated_rules(self, num: int):
+        pass
+
+    def money_changed(self, player: int, amount: int):
+        pass
 
     def debug_message(self, msg: str):
         print(f"Debug: {msg}")

@@ -107,10 +107,10 @@ class ChangeMoney(Command):
         return cls(int(params[0]))
 
     def write_data_str_list(self) -> list[object]:
-        return [str(self.number)]
+        return [str(self.amount)]
 
-    def __init__(self, number: int):
-        self.number = number
+    def __init__(self, amount: int):
+        self.amount = amount
 
 
 class NewGame(NoParameterCommand):
@@ -131,19 +131,19 @@ class PlayerLostACard(Command):
         self.player = player
         self.card = card
 
-
-class PlayerIsDead(Command):
-    message_name = "a_player_is_dead"
+class MoneyChanged(Command):
+    message_name = "money_changed"
 
     @classmethod
-    def parse_from_params(cls, params: list[str]) -> 'PlayerIsDead':
-        return cls(int(params[0]))
+    def parse_from_params(cls, params: list[str]) -> 'MoneyChanged':
+        return cls(int(params[0]), int(params[1]))
 
     def write_data_str_list(self) -> list[object]:
-        return [self.number]
+        return [self.player, self.amount]
 
-    def __init__(self, number: int):
-        self.number = number
+    def __init__(self, player: int, amount: int):
+        self.player = player
+        self.amount = amount
 
 
 class PlayerViolatedRules(Command):

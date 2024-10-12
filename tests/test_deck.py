@@ -23,10 +23,10 @@ class DeckTest(TestCase, Methods):
         game.setup_players()
 
         game.run_one_turn()
-        self.assertEqual(game.players[0].money, 2)
-        self.assertEqual(game.players[1].money, 2)
-        self.assertEqual(len(game.players[0].cards), 2)
-        self.assertEqual(len(game.players[1].cards), 2)
+        self.assertEqual(game.rule_abiding_players[0].money, 2)
+        self.assertEqual(game.rule_abiding_players[1].money, 2)
+        self.assertEqual(len(game.rule_abiding_players[0].cards), 2)
+        self.assertEqual(len(game.rule_abiding_players[1].cards), 2)
 
     def test_deck_state(self):
         clients = [get_server_mock_connection(MockLogic(Methods.always_ambassador, False, False, False)) for _ in
@@ -35,7 +35,7 @@ class DeckTest(TestCase, Methods):
         game.setup_players()
 
         game.run_one_turn()
-        all_cards_in_play = game.deck + game.players[0].cards + game.players[1].cards
+        all_cards_in_play = game.deck + game.rule_abiding_players[0].cards + game.rule_abiding_players[1].cards
         for c in Card.all():
             self.assertEqual(all_cards_in_play.count(c), EACH_CARD_IN_DECK)
 
@@ -44,13 +44,13 @@ class DeckTest(TestCase, Methods):
                    range(2)]
         game = Game(clients, deck=[Ambassador()] * 6)
         game.setup_players()
-        game.players[0].remove_card(Ambassador())
-        game.players[0].remove_card(Ambassador())
-        game.players[0].give_card(Assassin())
-        game.players[0].give_card(Assassin())
+        game.rule_abiding_players[0].remove_card(Ambassador())
+        game.rule_abiding_players[0].remove_card(Ambassador())
+        game.rule_abiding_players[0].give_card(Assassin())
+        game.rule_abiding_players[0].give_card(Assassin())
         game.run_one_turn()
 
-        self.assertEqual(game.players[0].cards, [Ambassador()] * 2)
+        self.assertEqual(game.rule_abiding_players[0].cards, [Ambassador()] * 2)
         self.assertEqual(game.deck, [Assassin()] * 2)
 
     def test_failed_challenge_ambassador(self):
@@ -58,20 +58,20 @@ class DeckTest(TestCase, Methods):
                    range(2)]
         game = Game(clients, deck=[Ambassador()] * 6)
         game.setup_players()
-        game.players[1].remove_card(Ambassador())
-        game.players[1].remove_card(Ambassador())
-        game.players[1].give_card(Assassin())
-        game.players[1].give_card(Assassin())
+        game.rule_abiding_players[1].remove_card(Ambassador())
+        game.rule_abiding_players[1].remove_card(Ambassador())
+        game.rule_abiding_players[1].give_card(Assassin())
+        game.rule_abiding_players[1].give_card(Assassin())
         game.deck = [Contessa()] * 2
         # Deck: 2 contessa, Player 0: 2 ambassadors, Player 1: 2 assassins
         game.run_one_turn()
 
         # Player 1 loses a card. Player 0 reveals amb and gets something back. Then Player 0's ambassador goes through,
         # giving them either one or two contessas (depending on what the reveal gave them), which will stick in hand.
-        self.assertEqual(game.players[1].cards, [Assassin()])
-        self.assertEqual(1 <= game.players[0].cards.count(Contessa()) <= 2, True)
+        self.assertEqual(game.rule_abiding_players[1].cards, [Assassin()])
+        self.assertEqual(1 <= game.rule_abiding_players[0].cards.count(Contessa()) <= 2, True)
 
-        all_cards_in_play: list[Card] = game.deck + game.players[0].cards + game.players[1].cards
+        all_cards_in_play: list[Card] = game.deck + game.rule_abiding_players[0].cards + game.rule_abiding_players[1].cards
         self.assertEqual(all_cards_in_play.count(Contessa()), 2)
         self.assertEqual(all_cards_in_play.count(Ambassador()), 2)
         self.assertEqual(all_cards_in_play.count(Assassin()), 1)

@@ -2,7 +2,7 @@ import random
 from collections.abc import Callable
 
 from common.common import debug_print
-from config import EACH_CARD_IN_DECK, WRONG_MESSAGE_TOLERANCE
+from config import EACH_CARD_IN_DECK, WRONG_MESSAGE_TOLERANCE, START_MONEY, START_CARDS_AMOUNT
 from connection.common import Connection
 from game.messages.commands import *
 from game.messages.responses import *
@@ -55,15 +55,15 @@ class Player:
 
 class Game:
     def __init__(self, connections: list[Connection], deck: list[Card] | None = None, crash_on_violation: bool = False):
-        self.players: dict[int, Player] = {i: Player(i, c) for i, c in enumerate(connections)}
-        self.alive_players: dict[int, Player] = {p: self.players[p] for p in self.players}
-        for p in self.players.values():
+        self.all_players: dict[int, Player] = {i: Player(i, c) for i, c in enumerate(connections)}
+        self.rule_abiding_players: dict[int, Player] = {p: self.all_players[p] for p in self.all_players}
+        self.alive_players: dict[int, Player] = {p: self.all_players[p] for p in self.all_players}
+        for p in self.all_players.values():
             p.send(SetPlayerNumber(p.number))
             name = self._extort_a_response(p, AskName(), NameResponse)
             if name is not None:
                 p.name = name.player_name
-        debug_print(f"Players {[p.name for p in self.players.values()]} joined.")
-        self.alive_players: dict[int, Player] = {p: self.players[p] for p in self.players}
+        debug_print(f"Players {[p.name for p in self.all_players.values()]} joined.")
         self.deck = []
         if deck is None:
             for c in Card.all():
@@ -73,20 +73,23 @@ class Game:
         self.crash_on_violation = crash_on_violation
 
     def _mark_player_dead(self, player: Player):
-        for p in self.players.values():
-            p.send(PlayerIsDead(player.number))
+        self.alive_players.pop(player.number)
+
+    def _mark_player_illegal(self, player: Player):
+        for p in self.rule_abiding_players.values():
+            p.send(PlayerViolatedRules(player.number))
+        self.rule_abiding_players.pop(player.number)
         self.alive_players.pop(player.number)
 
     def _emergency_kill(self, player: 'Player'):
         debug_print(f"Player {player.number} died because of rule violations")
         if self.crash_on_violation:
             raise Exception("Crashing on rule violation")
+        self._mark_player_illegal(player)
         for c in player.cards.copy():
             player.remove_card(c)
-            for p in self.players.values():
+            for p in self.rule_abiding_players.values():
                 p.send(PlayerLostACard(player.number, c))
-        self._mark_player_dead(player)
-
 
     def _extort_a_response[R](self, player: Player, command: Command, response_type: type[R], extra_condition: Callable[[R], bool] | None = None) -> R | None:
         try:
@@ -104,15 +107,15 @@ class Game:
 
     def _setup_player(self, player: Player):
         random.shuffle(self.deck)
-        player.give_card(self.deck.pop())
-        player.give_card(self.deck.pop())
-        player.give_money(2)
-        for other in self.players.values():
+        for _ in range(START_CARDS_AMOUNT):
+            player.give_card(self.deck.pop())
+        player.give_money(START_MONEY)
+        for other in self.rule_abiding_players.values():
             if player.number != other.number:
                 player.send(AddOpponent(other.number, other.name))
 
     def setup_players(self):
-        for p in self.players.values():
+        for p in self.rule_abiding_players.values():
             self._setup_player(p)
 
     def _get_other_players_than(self, num: int) -> dict[int, Player]:
@@ -133,7 +136,7 @@ class Game:
         else:
             player.remove_card(card_response.card)
 
-            for p in self.players.values():
+            for p in self.rule_abiding_players.values():
                 p.send(PlayerLostACard(player.number, card_response.card))
 
             if not player.cards:
@@ -209,7 +212,7 @@ class Game:
     def _log_challenge_result(self, player: Player, action: Action, target_num: int, challenger_num: int, successful: bool):
         debug_print(
             f"{action} challenged by {challenger_num} with success {successful}. Taken by {player.number} on {target_num}")
-        for p in self.players.values():
+        for p in self.rule_abiding_players.values():
             p.send(ActionWasChallenged(action, player.number, target_num, challenger_num, successful))
 
     def _handle_blocks(self, player: Player, action: ActionDecision):
@@ -298,23 +301,24 @@ class Game:
 
     def _log_block_result(self, player: Player, action: Action, target_num: int, blocked_with: Card, blocked_by: int):
         debug_print(f"{action} blocked with {blocked_with} by {blocked_by}. Taken by {player.number} on {target_num}")
-        for p in self.players.values():
+        for p in self.rule_abiding_players.values():
             p.send(ActionWasBlocked(action, player.number, target_num, blocked_with, blocked_by))
 
     def _log_block_challenge_result(self, player: Player, action: Action, target_num: int, blocked_with: Card, blocker_num: int,
                                     challenger_num: int, successful: bool):
         debug_print(
             f"Blocking with {blocked_with} by {blocker_num} the {action} taken by {player.number} on {target_num} challenged by {challenger_num} with success {successful}")
-        for p in self.players.values():
+        for p in self.rule_abiding_players.values():
             p.send(
                 BlockWasChallenged(action, player.number, target_num, blocked_with, blocker_num, challenger_num,
                                    successful))
 
     def _handle_steal(self, player: Player, target_num: int):
-        target_player = self.players[target_num]
+        target_player = self.all_players[target_num]
         money_stolen = min(target_player.money, 2)
-        player.give_money(money_stolen)
-        target_player.give_money(-money_stolen)
+        self._money_change(player, money_stolen)
+        self._money_change(target_player, -money_stolen)
+
         self._log_successful_action_result(player, Steal(), target_player.number)
 
     def _handle_assassinate(self, player: Player, target_num: int):
@@ -323,15 +327,15 @@ class Game:
         self._log_successful_action_result(player, Assassinate(), target_player.number)
 
     def _handle_foreign_aid(self, player: Player):
-        player.give_money(2)
+        self._money_change(player, 2)
         self._log_successful_action_result(player, ForeignAid(), -1)
 
     def _handle_income(self, player: Player):
-        player.give_money(1)
+        self._money_change(player, 1)
         self._log_successful_action_result(player, Income(), -1)
 
     def _handle_tax(self, player: Player):
-        player.give_money(3)
+        self._money_change(player, 3)
         self._log_successful_action_result(player, Tax(), -1)
 
     def _handle_coup(self, player: Player, target_num: int):
@@ -365,9 +369,14 @@ class Game:
         self.deck.append(decision.card2)
         self._log_successful_action_result(player, Ambassadate(), -1)
 
+    def _money_change(self, player: Player, amount: int):
+        player.give_money(amount)
+        for p in self.rule_abiding_players.values():
+            p.send(MoneyChanged(player.number, amount))
+
     def _log_successful_action_result(self, player: Player, action: Action, target_num: int):
         debug_print(f"{action} taken by {player.number} on {target_num} successful")
-        for p in self.players.values():
+        for p in self.rule_abiding_players.values():
             p.send(ActionWasTaken(action, player.number, target_num))
 
     def _take_action(self, player: Player):
@@ -396,7 +405,7 @@ class Game:
         self._handle_challenges(player, action)
 
         # At this point the cost should be paid
-        player.give_money(-action.action().cost)
+        self._money_change(player, -action.action().cost)
 
         # Target might be dead here. Try block only if possible target is alive
         if isinstance(action, TargetedActionDecision) and action.target() in self.alive_players or isinstance(action, NonTargetedActionDecision):
@@ -441,7 +450,7 @@ class Game:
 
         if len(self.alive_players) == 1:
             debug_print(f"Winner is {list(self.alive_players)[0]}!")
-            for p in self.players.values():
+            for p in self.rule_abiding_players.values():
                 p.shutdown()
             return True
         return False
