@@ -30,6 +30,10 @@ class ClientLogic:
     def set_player_number(self, num: int):
         raise NotImplementedError()
 
+    @abstractmethod
+    def new_game(self):
+        raise NotImplementedError()
+
     # State changes
     @abstractmethod
     def add_card(self, c: Card):
@@ -130,6 +134,9 @@ class ExtremelySimpleTestClient(ClientLogic):
     def set_player_number(self, num: int):
         self.number = num
         print(f"Your player number is {num}")
+
+    def new_game(self):
+        self.cards = []
 
     # State changes
     def add_card(self, c: Card):

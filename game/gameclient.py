@@ -29,6 +29,8 @@ class PlayerClient:
             self.logic.add_opponent(command.number, command.player_name)
         elif isinstance(command, SetPlayerNumber):
             self.logic.set_player_number(command.number)
+        elif isinstance(command, NewGame):
+            self.logic.new_game()
 
         # State changes
         elif isinstance(command, AddCard):
